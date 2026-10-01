@@ -13,7 +13,7 @@ B2C 쇼핑몰의 클릭·좋아요를 실시간 취향으로 바꾸고, 비슷�
 | 서빙 인덱스 / 캐시 / 락 | Redis Stack (RediSearch HNSW) |
 | 비동기 파이프라인 | BullMQ |
 | 인증 | JWT, Passport |
-| AI | `AI_PROVIDER=fake` 또는 `gemini` (`gemini-2.5-flash`, `gemini-embedding-001`) |
+| AI | `AI_PROVIDER=fake` 또는 `gemini` (`gemini-3.6-flash`, `gemini-embedding-001`) |
 
 일반 `redis` 이미지는 `FT.SEARCH`가 없습니다. 반드시 Redis Stack을 씁니다.
 
@@ -70,7 +70,7 @@ npm run seed
 | 일반 유저 | demo@pickflow.dev | Demo1234! |
 | 관리자 | admin@pickflow.dev | Admin1234! |
 
-Swagger는 개발 모드에서 [http://localhost:3000/docs](http://localhost:3000/docs) 입니다. 성공 응답은 인터셉터가 `{ success, data, requestId, timestamp }`로 감쌉니다.
+Swagger는 개발 모드에서 [http://localhost:3000/docs](http://localhost:3000/docs) 입니다. Authorize에 로그인 토큰을 넣으면 새로고침 후에도 유지됩니다. Bull Board는 [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) 에서 `user-events`, `profile-refresh`, `product-embedding` 큐를 봅니다. 둘 다 production에서는 열리지 않습니다. 성공 응답은 인터셉터가 `{ success, data, requestId, timestamp }`로 감쌉니다.
 
 ## 데모 순서
 
@@ -106,6 +106,24 @@ curl -s http://localhost:3000/api/v1/assistant/stats -H "Authorization: Bearer T
 
 `AI_PROVIDER=gemini`로 바꾸면 `GEMINI_API_KEY`가 필수입니다. 채팅 모델은 `gemini-2.5-flash`, 임베딩은 `gemini-embedding-001`이고 차원은 384로 맞춥니다. 공급자나 차원을 바꾼 뒤에는 관리자 토큰으로 `POST /api/v1/products/reindex`와 `POST /api/v1/assistant/cache/clear`를 호출해야 합니다. 서로 다른 모델의 벡터는 비교할 수 없습니다.
 
+## 부하 테스트
+
+k6는 Fake AI만 칩니다. `npm run start:load`가 `LOAD_TEST=true`와 `AI_PROVIDER=fake`를 프로세스 환경에 넣고, 코드는 이 모드에서 Gemini를 선택하지 않습니다. 같은 플래그가 켜져 있으면 로그인·질문 레이트리밋도 우회합니다. production에서는 `LOAD_TEST`를 켤 수 없습니다.
+
+이미 `npm run start:dev`가 3000을 쓰고 있으면 먼저 끄고 아래를 실행합니다.
+
+```bash
+npm run start:load
+```
+
+다른 터미널:
+
+```bash
+npm run loadtest
+```
+
+시나리오는 세 갈래입니다. 여러 유저가 상품과 행동(조회·클릭·좋아요·장바구니·구매)을 섞어 넣고, 어시스턴트는 같은 뜻의 질문과 다른 질문을 같이 보냅니다. 관리자 계정은 상품을 조금씩 등록해 임베딩 큐에 작업을 넣습니다. 콘솔에 나오는 로그와 에러 스택은 `logs/pick-flow.log`에도 쌓입니다.
+
 ## 테스트
 
 ```bash
@@ -128,7 +146,7 @@ docker build -t pick-flow .
 
 ```text
 src/
-  main.ts                 부트스트랩, Swagger
+  main.ts                 부트스트랩, Swagger, Bull Board
   app.module.ts           글로벌 가드, 인터셉터, 필터, 미들웨어
   config/                 환경 변수 검증과 중첩 설정
   common/                 데코레이터, 가드, 인터셉터, 예외 필터
@@ -144,4 +162,6 @@ src/
   assistant/              시맨틱 캐시를 쓰는 질문 API
   health/                 Postgres / Redis 프로브
   scripts/                시드
+load/k6.js              Fake AI 부하 시나리오
+scripts/start-load.js   LOAD_TEST + Fake AI 로 서버 기동
 ```

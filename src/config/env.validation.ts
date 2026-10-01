@@ -11,6 +11,7 @@ export const envValidationSchema = Joi.object({
   JWT_EXPIRES_SEC: Joi.number().integer().min(60).default(86_400),
   AI_PROVIDER: Joi.string().valid('fake', 'gemini').default('fake'),
   AI_FAKE_LATENCY_MS: Joi.number().integer().min(0).max(5_000).default(20),
+  AI_FAKE_CHAT_LATENCY_MS: Joi.number().integer().min(0).max(15_000).default(1_200),
   GEMINI_API_KEY: Joi.string().allow('').when('AI_PROVIDER', {
     is: 'gemini',
     then: Joi.required(),
@@ -24,4 +25,9 @@ export const envValidationSchema = Joi.object({
   SEMANTIC_CACHE_TTL_SEC: Joi.number().integer().min(30).default(86_400),
   SEMANTIC_CACHE_TOP_K: Joi.number().integer().min(1).max(10).default(1),
   REQUEST_TIMEOUT_MS: Joi.number().integer().min(100).default(10_000),
+  LOAD_TEST: Joi.boolean()
+    .truthy('true', '1')
+    .falsy('false', '0', '')
+    .default(false)
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(false) }),
 });

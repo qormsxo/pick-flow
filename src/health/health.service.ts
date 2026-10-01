@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
@@ -7,6 +8,8 @@ export interface HealthReport {
   status: 'ok' | 'degraded';
   postgres: boolean;
   redis: boolean;
+  aiProvider: string;
+  loadTest: boolean;
 }
 
 @Injectable()
@@ -14,6 +17,7 @@ export class HealthService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly redis: RedisService,
+    private readonly config: ConfigService,
   ) {}
 
   async check(): Promise<HealthReport> {
@@ -22,6 +26,8 @@ export class HealthService {
       status: postgres && redis ? 'ok' : 'degraded',
       postgres,
       redis,
+      aiProvider: this.config.get<string>('ai.provider') ?? 'fake',
+      loadTest: this.config.get<boolean>('app.loadTest') === true,
     };
   }
 

@@ -44,7 +44,7 @@ export class RedisVectorStore implements VectorStore {
     const returnFields = ['dist', ...spec.storedTextFields, ...spec.tagFields, ...spec.numericFields];
     const args: Array<string | number | Buffer> = [
       spec.name,
-      '*=>[KNN $k @embedding $vec AS dist EF_RUNTIME 64]',
+      '*=>[KNN $k @embedding $vec AS dist]',
       'PARAMS',
       4,
       'k',

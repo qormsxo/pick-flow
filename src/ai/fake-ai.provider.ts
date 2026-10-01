@@ -11,15 +11,17 @@ const CHAT_MODEL = 'fake-chat-v1';
 export class FakeAiProvider implements AiProvider {
   readonly name = 'fake';
   private readonly dimension: number;
-  private readonly latencyMs: number;
+  private readonly embedLatencyMs: number;
+  private readonly chatLatencyMs: number;
 
   constructor(config: ConfigService) {
     this.dimension = config.getOrThrow<number>('ai.embeddingDim');
-    this.latencyMs = config.getOrThrow<number>('ai.fakeLatencyMs');
+    this.embedLatencyMs = config.getOrThrow<number>('ai.fakeLatencyMs');
+    this.chatLatencyMs = config.getOrThrow<number>('ai.fakeChatLatencyMs');
   }
 
   async embed(text: string): Promise<AiEmbedding> {
-    await this.pause();
+    await this.pause(this.embedLatencyMs);
     return {
       vector: featureHashEmbedding(text, this.dimension),
       model: EMBEDDING_MODEL,
@@ -28,7 +30,7 @@ export class FakeAiProvider implements AiProvider {
   }
 
   async complete(prompt: string): Promise<AiCompletion> {
-    await this.pause();
+    await this.pause(this.chatLatencyMs);
     const names = [...prompt.matchAll(/^- (.+?) \|/gm)].map((match) => match[1]?.trim()).filter(Boolean);
     const question = prompt.match(/\[question\]\s*([\s\S]*?)\n\[catalog\]/)?.[1]?.trim() ?? '';
     const text =
@@ -46,8 +48,8 @@ export class FakeAiProvider implements AiProvider {
     };
   }
 
-  private async pause(): Promise<void> {
-    if (this.latencyMs > 0) await sleep(this.latencyMs);
+  private async pause(latencyMs: number): Promise<void> {
+    if (latencyMs > 0) await sleep(latencyMs);
   }
 }
 

@@ -34,7 +34,7 @@ export class EventProducer {
         'refresh',
         { userId },
         {
-          jobId: `profile:${userId}:${bucket}`,
+          jobId: `profile-${userId}-${bucket}`,
           delay,
           attempts: 8,
           backoff: { type: 'exponential', delay: 500 },

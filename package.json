@@ -8,7 +8,9 @@
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
+    "start:load": "node scripts/start-load.js",
     "start:prod": "node dist/main.js",
+    "loadtest": "k6 run load/k6.js",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "jest --runInBand",
     "seed": "node dist/scripts/seed.js"
@@ -17,6 +19,9 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@bull-board/api": "^9.10.2",
+    "@bull-board/express": "^9.10.2",
+    "@bull-board/nestjs": "^9.10.2",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",

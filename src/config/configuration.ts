@@ -4,6 +4,10 @@ function int(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function flag(value: string | undefined): boolean {
+  return value === 'true' || value === '1';
+}
+
 /**
  * process.env 는 항상 문자열이다.
  * Joi 가 형식만 검사하고, 여기서 애플리케이션이 쓰는 숫자/중첩 객체로 바꾼다.
@@ -13,6 +17,7 @@ export const configuration = () => ({
     env: process.env.NODE_ENV ?? 'development',
     port: int(process.env.PORT, 3000),
     requestTimeoutMs: int(process.env.REQUEST_TIMEOUT_MS, 10_000),
+    loadTest: flag(process.env.LOAD_TEST),
   },
   database: {
     url: process.env.DATABASE_URL ?? '',
@@ -25,8 +30,10 @@ export const configuration = () => ({
     expiresInSec: int(process.env.JWT_EXPIRES_SEC, 86_400),
   },
   ai: {
-    provider: process.env.AI_PROVIDER ?? 'fake',
+    // 부하 테스트 프로세스는 Gemini로 빠져나가지 않는다.
+    provider: flag(process.env.LOAD_TEST) ? 'fake' : (process.env.AI_PROVIDER ?? 'fake'),
     fakeLatencyMs: int(process.env.AI_FAKE_LATENCY_MS, 20),
+    fakeChatLatencyMs: int(process.env.AI_FAKE_CHAT_LATENCY_MS, 1_200),
     geminiApiKey: process.env.GEMINI_API_KEY ?? '',
     chatModel: process.env.GEMINI_CHAT_MODEL ?? 'gemini-2.5-flash',
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL ?? 'gemini-embedding-001',

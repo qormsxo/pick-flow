@@ -5,6 +5,7 @@ coverage/
 .env
 .env.local
 *.log
+logs/
 .DS_Store
 
 # 학습/면접 대본은 로컬 전용. 포트폴리오 저장소에는 코드와 README만 남긴다.

@@ -47,6 +47,11 @@ async function main(): Promise<void> {
       logger.log(`Queued embedding for ${product.sku}`);
     }
 
+    const pending = (await products.findAll()).filter((item) => !item.embeddingReady);
+    if (pending.length > 0) {
+      await catalog.reindexAll();
+    }
+
     const deadline = Date.now() + 20_000;
     while (Date.now() < deadline) {
       const all = await products.findAll();

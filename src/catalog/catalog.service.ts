@@ -63,10 +63,18 @@ export class CatalogService {
   }
 
   private async enqueueEmbedding(productId: string, force = false): Promise<void> {
-    const jobId = `embed:${productId}`;
+    const jobId = `embed-${productId}`;
     if (force) {
       const existing = await this.embeddings.getJob(jobId);
-      if (existing) await existing.remove();
+      if (existing) {
+        try {
+          await existing.remove();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/locked/i.test(message)) return;
+          throw error;
+        }
+      }
     }
     try {
       await this.embeddings.add(
@@ -76,7 +84,7 @@ export class CatalogService {
           jobId,
           attempts: 5,
           backoff: { type: 'exponential', delay: 1_000 },
-          removeOnComplete: true,
+          removeOnComplete: 100,
           removeOnFail: 100,
         },
       );
