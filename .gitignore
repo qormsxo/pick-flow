@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.local
+*.log
+.DS_Store
+
+# 학습/면접 대본은 로컬 전용. 포트폴리오 저장소에는 코드와 README만 남긴다.
+PROJECT_STUDY.md
+COMMIT_GUIDE.md
