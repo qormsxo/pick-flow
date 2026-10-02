@@ -10,7 +10,7 @@ export class HealthController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Postgres / Redis 연결 상태. 하나라도 실패하면 503' })
+  @ApiOperation({ summary: '데이터베이스와 Redis가 연결되어 있는지. 하나라도 실패하면 오류' })
   async check() {
     const report = await this.health.check();
     if (report.status !== 'ok') {

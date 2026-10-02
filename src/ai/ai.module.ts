@@ -9,7 +9,7 @@ import { GeminiProvider } from './gemini-ai.provider';
 export class AiModule {
   /**
    * AI_PROVIDER 환경 변수로 구현을 고른다.
-   * 호출부(Assistant, 임베딩 워커)는 AI_PROVIDER 토큰만 주입받는다.
+   * 호출부(취향 해석, 임베딩 워커)는 AI_PROVIDER 토큰만 주입받는다.
    */
   static register(): DynamicModule {
     return {

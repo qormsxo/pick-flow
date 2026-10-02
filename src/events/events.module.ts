@@ -8,6 +8,7 @@ import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { UserEventEntity } from './user-event.entity';
 import { UserEventProcessor } from './user-event.processor';
+import { PopularityService } from './popularity.service';
 import { UserEventsRepository } from './user-events.repository';
 
 @Module({
@@ -17,7 +18,7 @@ import { UserEventsRepository } from './user-events.repository';
     CatalogModule,
   ],
   controllers: [EventsController],
-  providers: [UserEventsRepository, EventProducer, EventsService, UserEventProcessor],
-  exports: [UserEventsRepository],
+  providers: [UserEventsRepository, EventProducer, EventsService, UserEventProcessor, PopularityService],
+  exports: [UserEventsRepository, PopularityService],
 })
 export class EventsModule {}

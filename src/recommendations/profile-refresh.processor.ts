@@ -5,7 +5,7 @@ import { ProductsRepository } from '../catalog/products.repository';
 import { EVENT_WEIGHT } from '../events/event-type.enum';
 import { UserEventsRepository } from '../events/user-events.repository';
 import { ProfileRefreshJob } from '../events/event-jobs';
-import { QUEUE_PROFILE_REFRESH, RECOMMENDATION_KEY_PATTERN, USER_VECTOR_KEY } from '../queue/queue.constants';
+import { HOT_WINDOW_SEC, QUEUE_PROFILE_REFRESH, RECOMMENDATION_KEY_PATTERN, USER_VECTOR_KEY } from '../queue/queue.constants';
 import { RedisService } from '../redis/redis.service';
 import { PreferencesRepository } from './preferences.repository';
 import { buildProfile } from './profile.builder';
@@ -66,7 +66,7 @@ export class ProfileRefreshProcessor extends WorkerHost {
       categoryWeights: profile.categoryWeights,
       eventCount: events.length,
     });
-    await this.redis.setJson(USER_VECTOR_KEY(job.data.userId), profile.interestVector);
+    await this.redis.setJson(USER_VECTOR_KEY(job.data.userId), profile.interestVector, HOT_WINDOW_SEC);
     await this.redis.deleteByPattern(RECOMMENDATION_KEY_PATTERN(job.data.userId));
     this.logger.log(`Refreshed profile user=${job.data.userId} events=${events.length}`);
   }

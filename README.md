@@ -1,19 +1,21 @@
 # pick-flow
 
-B2C 쇼핑몰의 클릭·좋아요를 실시간 취향으로 바꾸고, 비슷한 질문에는 LLM을 다시 호출하지 않는 추천 API입니다.
+B2C 쇼핑몰의 클릭·좋아요를 실시간 취향으로 바꾸고, 비슷한 행동 해석에는 LLM을 다시 호출하지 않는 추천 API입니다.
 
-유저가 상품을 누르면 API는 그 사실을 기록만 하고 바로 응답합니다. 취향 벡터 갱신과 상품 임베딩은 BullMQ 워커가 뒤에서 처리합니다. "비 오는 날 가벼운 자켓 추천해줘"와 "비오는 날 가벼운 재킷 추천"처럼 뜻이 같은 질문은 Redis 벡터 검색으로 묶어, 두 번째부터는 생성 비용이 0입니다. 로컬과 부하 테스트는 Fake AI Provider로 돌리므로 외부 API 비용도 0입니다.
+유저가 상품을 누르면 API는 그 사실을 기록만 하고 바로 응답합니다. 취향 벡터 갱신과 상품 임베딩은 BullMQ 워커가 뒤에서 처리합니다. 추천 목록은 좌표 비교로 고르고, 응답에 최근 행동이 어떤 쇼핑인지를 함께 넣습니다. 비슷한 행동이면 그 문장을 재사용해 생성 비용이 0입니다. 상품 좌표와 인기 점수는 Redis에 14일만 둡니다. 인기 점수는 날짜별로 쌓이고, 하루 목록은 상위 1만 개만 남습니다. 좌표 원본은 PostgreSQL에 남습니다. 로컬과 부하 테스트는 Fake AI Provider로 돌리므로 외부 API 비용도 0입니다.
 
 ## 기술 스택
 
-| 영역 | 선택 |
-| --- | --- |
-| API | NestJS 11, TypeScript |
-| 원장 | PostgreSQL 16, TypeORM migration |
-| 서빙 인덱스 / 캐시 / 락 | Redis Stack (RediSearch HNSW) |
-| 비동기 파이프라인 | BullMQ |
-| 인증 | JWT, Passport |
-| AI | `AI_PROVIDER=fake` 또는 `gemini` (`gemini-3.6-flash`, `gemini-embedding-001`) |
+
+| 영역              | 선택                                                                          |
+| --------------- | --------------------------------------------------------------------------- |
+| API             | NestJS 11, TypeScript                                                       |
+| 원장              | PostgreSQL 16, TypeORM migration                                            |
+| 서빙 인덱스 / 캐시 / 락 | Redis Stack (RediSearch HNSW)                                               |
+| 비동기 파이프라인       | BullMQ                                                                      |
+| 인증              | JWT, Passport                                                               |
+| AI              | `AI_PROVIDER=fake` 또는 `gemini` (`gemini-3.6-flash`, `gemini-embedding-001`) |
+
 
 일반 `redis` 이미지는 `FT.SEARCH`가 없습니다. 반드시 Redis Stack을 씁니다.
 
@@ -38,12 +40,12 @@ flowchart LR
   api -->|유저 벡터 KNN 또는 인기 상품| redis
   api --> pg
 
-  client -->|POST /assistant/ask| api
-  api -->|exact 키 다음 벡터 KNN| redis
+  client -->|GET /recommendations/insight| api
+  api -->|행동 문장 exact 키 다음 벡터 KNN| redis
   api -->|미스일 때만| ai
 ```
 
-개인화 추천과 어시스턴트 캐시는 일부러 분리했습니다. 추천은 사람마다 달라야 하고, 시맨틱 캐시는 질문의 뜻이 같으면 누구의 답인든 재사용해야 합니다. 둘을 한 캐시에 넣으면 히트율이 무너지고 다른 유저의 취향이 섞입니다.
+추천 목록과 행동 해석 캐시는 일부러 분리했습니다. 추천 상품은 사람마다 달라야 하고, 시맨틱 캐시는 행동의 뜻이 같으면 어떤 쇼핑인지에 대한 답을 다시 써야 합니다. 추천 결과 자체를 그 캐시에 넣으면 다른 사람의 상품 목록이 섞입니다.
 
 ## 로컬 실행
 
@@ -65,10 +67,12 @@ npm run seed
 
 시드 계정은 로컬 데모용입니다.
 
-| 역할 | 이메일 | 비밀번호 |
-| --- | --- | --- |
-| 일반 유저 | demo@pickflow.dev | Demo1234! |
-| 관리자 | admin@pickflow.dev | Admin1234! |
+
+| 역할    | 이메일                                             | 비밀번호       |
+| ----- | ----------------------------------------------- | ---------- |
+| 일반 유저 | [demo@pickflow.dev](mailto:demo@pickflow.dev)   | Demo1234!  |
+| 관리자   | [admin@pickflow.dev](mailto:admin@pickflow.dev) | Admin1234! |
+
 
 Swagger는 개발 모드에서 [http://localhost:3000/docs](http://localhost:3000/docs) 입니다. Authorize에 로그인 토큰을 넣으면 새로고침 후에도 유지됩니다. Bull Board는 [http://localhost:3000/admin/queues](http://localhost:3000/admin/queues) 에서 `user-events`, `profile-refresh`, `product-embedding` 큐를 봅니다. 둘 다 production에서는 열리지 않습니다. 성공 응답은 인터셉터가 `{ success, data, requestId, timestamp }`로 감쌉니다.
 
@@ -90,25 +94,17 @@ curl -s -D - http://localhost:3000/api/v1/events ^
 # 4. 5초 안팎 뒤 추천. 임베딩이 끝났으면 source 가 personalized 가 된다.
 curl -s "http://localhost:3000/api/v1/recommendations?limit=5" -H "Authorization: Bearer TOKEN"
 
-# 5. 비슷한 질문을 두 번. 첫 응답 match=generated, 두 번째 match=semantic 또는 exact.
-curl -s http://localhost:3000/api/v1/assistant/ask ^
-  -H "Authorization: Bearer TOKEN" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"question\":\"비 오는 날 입을 가벼운 자켓 추천해줘\"}"
+# 5. 좋아요 뒤에 어떤 쇼핑인지. 행동이 없으면 match=skipped. 처음은 generated, 같은 행동이면 exact 또는 semantic.
+curl -s http://localhost:3000/api/v1/recommendations/insight -H "Authorization: Bearer TOKEN"
 
-curl -s http://localhost:3000/api/v1/assistant/ask ^
-  -H "Authorization: Bearer TOKEN" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"question\":\"비오는 날 가벼운 재킷 추천\"}"
-
-curl -s http://localhost:3000/api/v1/assistant/stats -H "Authorization: Bearer TOKEN"
+curl -s http://localhost:3000/api/v1/recommendations/cache/stats -H "Authorization: Bearer TOKEN"
 ```
 
-`AI_PROVIDER=gemini`로 바꾸면 `GEMINI_API_KEY`가 필수입니다. 채팅 모델은 `gemini-2.5-flash`, 임베딩은 `gemini-embedding-001`이고 차원은 384로 맞춥니다. 공급자나 차원을 바꾼 뒤에는 관리자 토큰으로 `POST /api/v1/products/reindex`와 `POST /api/v1/assistant/cache/clear`를 호출해야 합니다. 서로 다른 모델의 벡터는 비교할 수 없습니다.
+`AI_PROVIDER=gemini`로 바꾸면 `GEMINI_API_KEY`가 필수입니다. 채팅 모델은 `gemini-2.5-flash`, 임베딩은 `gemini-embedding-001`이고 차원은 384로 맞춥니다. 공급자나 차원을 바꾼 뒤에는 관리자 토큰으로 `POST /api/v1/products/reindex`와 `POST /api/v1/recommendations/cache/clear`를 호출해야 합니다. 서로 다른 모델의 벡터는 비교할 수 없습니다.
 
 ## 부하 테스트
 
-k6는 Fake AI만 칩니다. `npm run start:load`가 `LOAD_TEST=true`와 `AI_PROVIDER=fake`를 프로세스 환경에 넣고, 코드는 이 모드에서 Gemini를 선택하지 않습니다. 같은 플래그가 켜져 있으면 로그인·질문 레이트리밋도 우회합니다. production에서는 `LOAD_TEST`를 켤 수 없습니다.
+k6는 Fake AI만 칩니다. `npm run start:load`가 `LOAD_TEST=true`와 `AI_PROVIDER=fake`를 프로세스 환경에 넣고, 코드는 이 모드에서 Gemini를 선택하지 않습니다. 같은 플래그가 켜져 있으면 로그인과 쇼핑 해석 횟수 제한도 우회합니다. production에서는 `LOAD_TEST`를 켤 수 없습니다.
 
 이미 `npm run start:dev`가 3000을 쓰고 있으면 먼저 끄고 아래를 실행합니다.
 
@@ -122,7 +118,7 @@ npm run start:load
 npm run loadtest
 ```
 
-시나리오는 세 갈래입니다. 여러 유저가 상품과 행동(조회·클릭·좋아요·장바구니·구매)을 섞어 넣고, 어시스턴트는 같은 뜻의 질문과 다른 질문을 같이 보냅니다. 관리자 계정은 상품을 조금씩 등록해 임베딩 큐에 작업을 넣습니다. 콘솔에 나오는 로그와 에러 스택은 `logs/pick-flow.log`에도 쌓입니다.
+시나리오는 세 갈래입니다. 여러 유저가 상품과 행동(조회·클릭·좋아요·장바구니·구매)을 섞어 넣고, 어떤 쇼핑인지 API로 저장된 답 재사용을 셉니다. 관리자 계정은 상품을 조금씩 등록해 임베딩 큐에 작업을 넣습니다. 콘솔에 나오는 로그와 에러 스택은 `logs/pick-flow.log`에도 쌓입니다.
 
 ## 테스트
 
@@ -158,10 +154,10 @@ src/
   auth/ users/            JWT 회원가입, 로그인
   catalog/                상품 원장과 임베딩 워커
   events/                 202 수집 API와 적재 워커
-  recommendations/        취향 벡터, 추천 API
-  assistant/              시맨틱 캐시를 쓰는 질문 API
+  recommendations/        취향 좌표, 추천 API, 어떤 쇼핑인지
   health/                 Postgres / Redis 프로브
   scripts/                시드
 load/k6.js              Fake AI 부하 시나리오
 scripts/start-load.js   LOAD_TEST + Fake AI 로 서버 기동
 ```
+

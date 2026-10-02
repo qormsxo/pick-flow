@@ -22,7 +22,7 @@ export class CatalogController {
   @ApiBearerAuth()
   @Roles(UserRole.ADMIN)
   @Post('reindex')
-  @ApiOperation({ summary: '전체 상품 임베딩 작업을 다시 넣는다' })
+  @ApiOperation({ summary: '상품 좌표를 모두 다시 만든다' })
   reindex() {
     return this.catalog.reindexAll().then((queued) => ({ queued }));
   }
@@ -37,7 +37,7 @@ export class CatalogController {
   @ApiBearerAuth()
   @Roles(UserRole.ADMIN)
   @Post()
-  @ApiOperation({ summary: '상품 등록. 임베딩은 큐에서 비동기로 만든다' })
+  @ApiOperation({ summary: '상품을 등록한다. 좌표는 뒤에서 만든다' })
   create(@Body() dto: CreateProductDto) {
     return this.catalog.create(dto);
   }

@@ -25,7 +25,7 @@ async function bootstrap(): Promise<void> {
       app,
       new DocumentBuilder()
         .setTitle('pick-flow')
-        .setDescription('Redis semantic cache와 BullMQ로 실시간 개인화 추천을 제공하는 B2C API')
+        .setDescription('클릭과 좋아요로 취향을 만들고, 비슷한 쇼핑 해석은 저장된 답을 다시 쓰는 추천 API')
         .setVersion('1.0')
         .addBearerAuth()
         .build(),

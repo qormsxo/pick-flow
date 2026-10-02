@@ -87,6 +87,31 @@ export class RedisService implements OnModuleDestroy {
     return this.client.zrevrange(key, start, stop);
   }
 
+  async zrangeWithScores(
+    key: string,
+    start: number,
+    stop: number,
+  ): Promise<Array<{ member: string; score: number }>> {
+    const raw = await this.client.zrange(key, start, stop, 'WITHSCORES');
+    const rows: Array<{ member: string; score: number }> = [];
+    for (let index = 0; index < raw.length; index += 2) {
+      rows.push({ member: raw[index] ?? '', score: Number(raw[index + 1] ?? 0) });
+    }
+    return rows;
+  }
+
+  async zcard(key: string): Promise<number> {
+    return this.client.zcard(key);
+  }
+
+  async zremrangebyrank(key: string, start: number, stop: number): Promise<void> {
+    await this.client.zremrangebyrank(key, start, stop);
+  }
+
+  async expire(key: string, ttlSec: number): Promise<void> {
+    await this.client.expire(key, ttlSec);
+  }
+
   async deleteByPattern(pattern: string): Promise<number> {
     let cursor = '0';
     let removed = 0;

@@ -31,12 +31,14 @@ export class FakeAiProvider implements AiProvider {
 
   async complete(prompt: string): Promise<AiCompletion> {
     await this.pause(this.chatLatencyMs);
-    const names = [...prompt.matchAll(/^- (.+?) \|/gm)].map((match) => match[1]?.trim()).filter(Boolean);
-    const question = prompt.match(/\[question\]\s*([\s\S]*?)\n\[catalog\]/)?.[1]?.trim() ?? '';
-    const text =
-      names.length > 0
-        ? `${question} 기준으로 가까운 상품은 ${names.join(', ')}입니다. 먼저 ${names[0]}을 보세요.`
-        : `${question}에 가까운 상품이 아직 인덱스에 없습니다. 상품 임베딩이 끝난 뒤 다시 물어보세요.`;
+    const actions = [
+      ...prompt.matchAll(/^- (?:VIEW|CLICK|LIKE|CART|PURCHASE) \| (.+?) \| ([^|]+) \| (.+)$/gm),
+    ];
+    const lead = actions[0];
+    const name = lead?.[1]?.trim();
+    const text = name
+      ? `지금은 ${name}처럼 고르는 쇼핑입니다. 같은 쓰임새를 이어서 보면 됩니다.`
+      : '최근 행동이 없어 어떤 쇼핑인지 말하지 못했습니다.';
     const promptTokens = estimateTokens(prompt);
     const completionTokens = estimateTokens(text);
     return {

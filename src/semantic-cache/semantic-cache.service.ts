@@ -20,7 +20,7 @@ interface ResolveInput {
 }
 
 /**
- * 질문 캐시의 두 단계.
+ * 행동 해석 캐시의 두 단계.
  * 1) 정규화 문자열이 같으면 임베딩 없이 exact hit.
  * 2) 아니면 벡터 KNN. threshold 이상이면 생성 호출을 건너뛴다.
  *

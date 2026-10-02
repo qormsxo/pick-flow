@@ -1,19 +1,47 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { AuthUser } from '../common/interfaces/auth-user.interface';
+import { UserRole } from '../users/user-role.enum';
 import { RecommendationQueryDto } from './dto/recommendation-query.dto';
 import { RecommendationsService } from './recommendations.service';
+import { TasteInsightService } from './taste-insight.service';
 
 @ApiTags('recommendations')
 @ApiBearerAuth()
 @Controller('recommendations')
 export class RecommendationsController {
-  constructor(private readonly recommendations: RecommendationsService) {}
+  constructor(
+    private readonly recommendations: RecommendationsService,
+    private readonly insight: TasteInsightService,
+  ) {}
 
   @Get()
-  @ApiOperation({ summary: '유저 관심 벡터 또는 인기 상품 기반 추천' })
+  @ApiOperation({ summary: '취향과 가까운 상품을 추천한다. 취향이 없으면 인기 상품' })
   list(@CurrentUser() user: AuthUser, @Query() query: RecommendationQueryDto) {
     return this.recommendations.recommend(user.userId, query.limit ?? 10);
+  }
+
+  @RateLimit(30, 60)
+  @Get('insight')
+  @ApiOperation({ summary: '최근 행동이 어떤 쇼핑인지 알려 준다. 비슷한 행동이면 저장된 답을 쓴다' })
+  insightForUser(@CurrentUser() user: AuthUser) {
+    return this.insight.describe(user.userId);
+  }
+
+  @Get('cache/stats')
+  @ApiOperation({ summary: '저장된 답을 재사용한 횟수와 아낀 토큰' })
+  stats() {
+    return this.insight.stats();
+  }
+
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Post('cache/clear')
+  @ApiOperation({ summary: '저장된 쇼핑 해석을 비운다' })
+  clear() {
+    return this.insight.clearCache().then(() => ({ cleared: true }));
   }
 }

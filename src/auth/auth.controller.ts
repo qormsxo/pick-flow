@@ -14,7 +14,7 @@ export class AuthController {
   @Public()
   @RateLimit(10, 60)
   @Post('register')
-  @ApiOperation({ summary: '회원가입 후 액세스 토큰 발급' })
+  @ApiOperation({ summary: '회원가입 후 로그인 토큰을 발급한다' })
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }

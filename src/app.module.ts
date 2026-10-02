@@ -2,7 +2,6 @@ import { MiddlewareConsumer, Module, NestModule, RequestMethod, ValidationPipe }
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AiModule } from './ai/ai.module';
-import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
@@ -42,7 +41,6 @@ import { UsersModule } from './users/users.module';
     CatalogModule,
     EventsModule,
     RecommendationsModule,
-    AssistantModule,
     HealthModule,
   ],
   providers: [

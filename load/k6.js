@@ -14,20 +14,6 @@ const eventTypes = ['VIEW', 'CLICK', 'LIKE', 'CART', 'PURCHASE'];
 const categories = ['outer', 'electronics', 'living', 'shoes', 'accessory'];
 const limits = [3, 5, 10];
 
-const similarQuestions = [
-  '비 오는 날 입을 가벼운 자켓 추천해줘',
-  '비오는 날 가벼운 재킷 추천',
-  '비 오는 날 가벼운 자켓 추천',
-];
-
-const freshQuestions = [
-  '저소음 기계식 키보드 추천',
-  '홈카페 드립 세트 뭐가 좋아',
-  '출퇴근용 노이즈캔슬링 헤드폰',
-  '가벼운 캠핑 체어 추천해줘',
-  '업무용 14인치 노트북 추천',
-];
-
 const shopperAccounts = [
   { email: 'demo@pickflow.dev', displayName: '데모 유저' },
   { email: 'load1@pickflow.dev', displayName: '부하 유저 1' },
@@ -44,11 +30,11 @@ export const options = {
       duration: '45s',
       exec: 'trackEvents',
     },
-    assistant: {
+    insight: {
       executor: 'constant-vus',
       vus: 10,
       duration: '45s',
-      exec: 'askQuestions',
+      exec: 'readInsights',
     },
     catalog: {
       executor: 'constant-arrival-rate',
@@ -135,20 +121,15 @@ export function trackEvents(data) {
   sleep(0.15);
 }
 
-export function askQuestions(data) {
+export function readInsights(data) {
   const token = data.shoppers[__VU % data.shoppers.length];
-  const fresh = __ITER % 3 === 0;
-  const pool = fresh ? freshQuestions : similarQuestions;
-  const question = pool[(__VU + __ITER) % pool.length];
-  const askRes = http.post(
-    `${baseUrl}/api/v1/assistant/ask`,
-    JSON.stringify({ question }),
-    { headers: jsonHeaders(token) },
-  );
-  if (check(askRes, { 'assistant ok': (res) => res.status === 200 })) {
-    const match = askRes.json('data.match');
+  const insightRes = http.get(`${baseUrl}/api/v1/recommendations/insight`, {
+    headers: jsonHeaders(token),
+  });
+  if (check(insightRes, { 'insight ok': (res) => res.status === 200 })) {
+    const match = insightRes.json('data.match');
     if (match === 'generated') generated.add(1);
-    else cacheHits.add(1);
+    else if (match && match !== 'skipped') cacheHits.add(1);
   }
   sleep(0.2);
 }

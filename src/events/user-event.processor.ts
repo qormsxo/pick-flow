@@ -1,12 +1,13 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job, UnrecoverableError } from 'bullmq';
+import { ProductIndexService } from '../catalog/product-index.service';
 import { ProductsRepository } from '../catalog/products.repository';
 import { EVENT_WEIGHT } from './event-type.enum';
-import { POPULARITY_KEY, QUEUE_USER_EVENTS } from '../queue/queue.constants';
+import { QUEUE_USER_EVENTS } from '../queue/queue.constants';
 import { UserEventJob } from './event-jobs';
-import { RedisService } from '../redis/redis.service';
 import { EventProducer } from './event.producer';
+import { PopularityService } from './popularity.service';
 import { UserEventsRepository } from './user-events.repository';
 
 @Processor(QUEUE_USER_EVENTS, { concurrency: 8 })
@@ -17,7 +18,8 @@ export class UserEventProcessor extends WorkerHost {
     private readonly events: UserEventsRepository,
     private readonly products: ProductsRepository,
     private readonly producer: EventProducer,
-    private readonly redis: RedisService,
+    private readonly popularity: PopularityService,
+    private readonly index: ProductIndexService,
   ) {
     super();
   }
@@ -40,7 +42,18 @@ export class UserEventProcessor extends WorkerHost {
       createdAt: new Date(job.data.occurredAt),
     });
 
-    await this.redis.zincrby(POPULARITY_KEY, EVENT_WEIGHT[job.data.type], product.id);
+    await this.popularity.add(product.id, EVENT_WEIGHT[job.data.type], new Date(job.data.occurredAt));
+    if (product.embedding?.length) {
+      await this.index.upsert({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        sku: product.sku,
+        price: product.price,
+        embedding: product.embedding,
+      });
+    }
     await this.producer.enqueueProfileRefresh(job.data.userId);
   }
 

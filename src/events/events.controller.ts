@@ -13,7 +13,7 @@ export class EventsController {
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: '클릭/좋아요 등 행동 이벤트를 큐에 넣고 즉시 202 를 반환한다' })
+  @ApiOperation({ summary: '조회, 클릭, 좋아요, 장바구니, 구매를 받고 바로 응답한다' })
   track(
     @CurrentUser() user: AuthUser,
     @Body() dto: TrackEventDto,

@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ProductIndexService } from '../catalog/product-index.service';
 import { ProductsRepository } from '../catalog/products.repository';
 import { sleep } from '../common/utils/sleep.util';
-import { POPULARITY_KEY, USER_VECTOR_KEY } from '../queue/queue.constants';
+import { PopularityService } from '../events/popularity.service';
+import { HOT_WINDOW_SEC, USER_VECTOR_KEY } from '../queue/queue.constants';
 import { RedisService } from '../redis/redis.service';
 import { PreferencesRepository } from './preferences.repository';
+import { TasteInsightService } from './taste-insight.service';
 
 export interface RecommendationItem {
   productId: string;
@@ -18,6 +20,8 @@ export interface RecommendationItem {
 interface CachedRecommendations {
   source: 'personalized' | 'popular';
   items: RecommendationItem[];
+  summary: string | null;
+  summaryMatch: string | null;
 }
 
 export interface RecommendationResult extends CachedRecommendations {
@@ -32,13 +36,17 @@ export class RecommendationsService {
     private readonly preferences: PreferencesRepository,
     private readonly products: ProductsRepository,
     private readonly index: ProductIndexService,
+    private readonly popularity: PopularityService,
+    private readonly insight: TasteInsightService,
   ) {}
 
   async recommend(userId: string, limit: number): Promise<RecommendationResult> {
     const started = Date.now();
     const cacheKey = `rec:${userId}:${limit}`;
     const cached = await this.redis.getJson<CachedRecommendations>(cacheKey);
-    if (cached) return { ...cached, cacheHit: true, tookMs: Date.now() - started };
+    if (cached?.items && cached.summaryMatch !== undefined) {
+      return { ...cached, cacheHit: true, tookMs: Date.now() - started };
+    }
 
     let cacheHit = false;
     const built = await this.redis.withLock(
@@ -50,7 +58,7 @@ export class RecommendationsService {
           cacheHit = true;
           return again;
         }
-        const fresh = await this.build(userId, limit);
+        const fresh = await this.withScene(userId, await this.build(userId, limit));
         await this.redis.setJson(cacheKey, fresh, 60);
         return fresh;
       },
@@ -61,7 +69,7 @@ export class RecommendationsService {
           cacheHit = true;
           return waited;
         }
-        return this.build(userId, limit);
+        return this.withScene(userId, await this.build(userId, limit));
       },
     );
 
@@ -76,6 +84,8 @@ export class RecommendationsService {
         if (hits.length > 0) {
           return {
             source: 'personalized' as const,
+            summary: null,
+            summaryMatch: null,
             items: hits.map((hit) => ({
               productId: hit.id,
               name: hit.name,
@@ -100,12 +110,21 @@ export class RecommendationsService {
 
     const preference = await this.preferences.findByUserId(userId);
     if (!preference?.interestVector?.length) return null;
-    await this.redis.setJson(USER_VECTOR_KEY(userId), preference.interestVector);
+    await this.redis.setJson(USER_VECTOR_KEY(userId), preference.interestVector, HOT_WINDOW_SEC);
     return preference.interestVector;
   }
 
+  private async withScene(userId: string, built: CachedRecommendations): Promise<CachedRecommendations> {
+    try {
+      const scene = await this.insight.describe(userId);
+      return { ...built, summary: scene.summary, summaryMatch: scene.match };
+    } catch {
+      return built;
+    }
+  }
+
   private async popular(limit: number): Promise<CachedRecommendations> {
-    const ids = await this.redis.zrevrange(POPULARITY_KEY, 0, limit - 1);
+    const ids = await this.popularity.top(limit);
     const products = await this.products.findByIds(ids);
     const byId = new Map(products.map((product) => [product.id, product]));
     const items = ids.flatMap((id, index) => {
@@ -122,6 +141,6 @@ export class RecommendationsService {
         },
       ];
     });
-    return { source: 'popular', items };
+    return { source: 'popular', summary: null, summaryMatch: null, items };
   }
 }

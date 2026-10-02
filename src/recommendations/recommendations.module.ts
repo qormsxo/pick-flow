@@ -9,6 +9,7 @@ import { PreferencesRepository } from './preferences.repository';
 import { ProfileRefreshProcessor } from './profile-refresh.processor';
 import { RecommendationsController } from './recommendations.controller';
 import { RecommendationsService } from './recommendations.service';
+import { TasteInsightService } from './taste-insight.service';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { RecommendationsService } from './recommendations.service';
     EventsModule,
   ],
   controllers: [RecommendationsController],
-  providers: [PreferencesRepository, ProfileRefreshProcessor, RecommendationsService],
+  providers: [PreferencesRepository, ProfileRefreshProcessor, RecommendationsService, TasteInsightService],
   exports: [RecommendationsService],
 })
 export class RecommendationsModule {}

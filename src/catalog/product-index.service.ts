@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HOT_WINDOW_SEC } from '../queue/queue.constants';
 import { RedisVectorStore } from '../redis/redis-vector.store';
 import { VectorIndexSpec } from '../redis/vector-store.interface';
 
@@ -56,7 +57,7 @@ export class ProductIndexService implements OnModuleInit {
         sku: sanitizeTag(product.sku),
         price: String(Number(product.price)),
       },
-    });
+    }, HOT_WINDOW_SEC);
   }
 
   async search(embedding: number[], k: number): Promise<IndexedProduct[]> {
