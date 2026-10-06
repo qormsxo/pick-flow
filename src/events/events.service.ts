@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EVENT_DEDUPE_KEY, EVENT_DEDUPE_TTL_SEC } from '../queue/queue.constants';
-import { RedisService } from '../redis/redis.service';
+import { DedupeStore, RedisService } from '../redis/redis.service';
 import { TrackEventDto } from './dto/track-event.dto';
-import { EventProducer } from './event.producer';
+import { EventProducer, EventSink } from './event.producer';
 
 export interface TrackResult {
   accepted: true;
@@ -14,8 +14,8 @@ export interface TrackResult {
 @Injectable()
 export class EventsService {
   constructor(
-    private readonly redis: RedisService,
-    private readonly producer: EventProducer,
+    @Inject(RedisService) private readonly redis: DedupeStore,
+    @Inject(EventProducer) private readonly producer: EventSink,
   ) {}
 
   /**
@@ -26,18 +26,22 @@ export class EventsService {
   async track(userId: string, dto: TrackEventDto, idempotencyKey?: string): Promise<TrackResult> {
     const headerId =
       idempotencyKey && /^[A-Za-z0-9_:-]{8,64}$/.test(idempotencyKey) ? idempotencyKey : undefined;
+
     const clientEventId = dto.clientEventId ?? headerId ?? randomUUID();
+
     if (dto.metadata && JSON.stringify(dto.metadata).length > 2_000) {
       throw new BadRequestException('metadata is too large');
     }
 
     const dedupeKey = EVENT_DEDUPE_KEY(clientEventId);
     let fresh = false;
+
     try {
       fresh = await this.redis.setNx(dedupeKey, userId, EVENT_DEDUPE_TTL_SEC);
     } catch {
       throw new ServiceUnavailableException('Event intake unavailable');
     }
+
     if (!fresh) return { accepted: true, duplicate: true, clientEventId };
 
     try {

@@ -2,10 +2,27 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import Redis, { Command } from 'ioredis';
+import { JsonValue, readJson } from '../common/utils/json-value';
 import { RATE_LIMIT_LUA, UNLOCK_LUA } from './lua';
+import { isRedisReply, RedisReply } from './search-reply';
+
+export interface DedupeStore {
+  setNx(key: string, value: string, ttlSec: number): Promise<boolean>;
+  del(key: string): Promise<void>;
+}
+
+export interface JsonStore {
+  getJson(key: string): Promise<JsonValue | null>;
+  setJson(key: string, value: JsonValue, ttlSec?: number): Promise<void>;
+  incr(key: string): Promise<number>;
+  incrBy(key: string, amount: number): Promise<number>;
+  mget(keys: string[]): Promise<Array<string | null>>;
+  deleteByPattern(pattern: string): Promise<number>;
+  withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>, onBusy: () => Promise<T>): Promise<T>;
+}
 
 @Injectable()
-export class RedisService implements OnModuleDestroy {
+export class RedisService implements OnModuleDestroy, DedupeStore, JsonStore {
   private readonly logger = new Logger(RedisService.name);
   private readonly client: Redis;
 
@@ -31,34 +48,49 @@ export class RedisService implements OnModuleDestroy {
   /**
    * Buffer 인자는 bulk string 으로 그대로 나간다.
    * replyEncoding 은 응답 바이트만 문자열로 바꾼다.
+   * ioredis 5 타입은 sendCommand 를 unknown 으로 두지만, 런타임은 Promise 다.
    */
-  command(name: string, args: Array<string | number | Buffer> = []): Promise<unknown> {
-    // ioredis 5 타입은 sendCommand 반환을 unknown 으로 두지만, 런타임은 Promise 다.
-    return this.client.sendCommand(new Command(name, args, { replyEncoding: 'utf8' })) as Promise<unknown>;
+  async command(name: string, args: Array<string | number | Buffer> = []): Promise<RedisReply> {
+    const reply = await Promise.resolve(this.client.sendCommand(new Command(name, args, { replyEncoding: 'utf8' })));
+
+    if (!isRedisReply(reply)) {
+      throw new Error(`Unexpected Redis reply for ${name}`);
+    }
+
+    return reply;
   }
 
-  async getJson<T>(key: string): Promise<T | null> {
+  async getJson(key: string): Promise<JsonValue | null> {
     const raw = await this.client.get(key);
+
     if (!raw) return null;
-    try {
-      return JSON.parse(raw) as T;
-    } catch (error) {
-      this.logger.warn(`Discarding corrupt cache key ${key}: ${error instanceof Error ? error.message : error}`);
+
+    const parsed = readJson(raw);
+
+    if (parsed === undefined) {
+      this.logger.warn(`Discarding corrupt cache key ${key}`);
+
       return null;
     }
+
+    return parsed;
   }
 
-  async setJson(key: string, value: unknown, ttlSec?: number): Promise<void> {
+  async setJson(key: string, value: JsonValue, ttlSec?: number): Promise<void> {
     const payload = JSON.stringify(value);
+
     if (ttlSec && ttlSec > 0) {
       await this.client.set(key, payload, 'EX', ttlSec);
+
       return;
     }
+
     await this.client.set(key, payload);
   }
 
   async setNx(key: string, value: string, ttlSec: number): Promise<boolean> {
     const result = await this.client.set(key, value, 'EX', ttlSec, 'NX');
+
     return result === 'OK';
   }
 
@@ -76,6 +108,7 @@ export class RedisService implements OnModuleDestroy {
 
   async mget(keys: string[]): Promise<Array<string | null>> {
     if (keys.length === 0) return [];
+
     return this.client.mget(...keys);
   }
 
@@ -94,9 +127,11 @@ export class RedisService implements OnModuleDestroy {
   ): Promise<Array<{ member: string; score: number }>> {
     const raw = await this.client.zrange(key, start, stop, 'WITHSCORES');
     const rows: Array<{ member: string; score: number }> = [];
+
     for (let index = 0; index < raw.length; index += 2) {
       rows.push({ member: raw[index] ?? '', score: Number(raw[index + 1] ?? 0) });
     }
+
     return rows;
   }
 
@@ -115,18 +150,23 @@ export class RedisService implements OnModuleDestroy {
   async deleteByPattern(pattern: string): Promise<number> {
     let cursor = '0';
     let removed = 0;
+
     do {
       const [next, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
       cursor = next;
+
       if (keys.length > 0) removed += await this.client.del(...keys);
     } while (cursor !== '0');
+
     return removed;
   }
 
   async withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>, onBusy: () => Promise<T>): Promise<T> {
     const token = randomUUID();
     const acquired = await this.client.set(key, token, 'PX', ttlMs, 'NX');
+
     if (acquired !== 'OK') return onBusy();
+
     try {
       return await fn();
     } finally {
@@ -140,7 +180,8 @@ export class RedisService implements OnModuleDestroy {
     windowSec: number,
   ): Promise<{ allowed: boolean; count: number }> {
     const now = Date.now();
-    const reply = (await this.client.eval(
+
+    const reply = await this.client.eval(
       RATE_LIMIT_LUA,
       1,
       key,
@@ -149,10 +190,15 @@ export class RedisService implements OnModuleDestroy {
       String(limit),
       `${now}:${randomUUID()}`,
       String(windowSec),
-    )) as [number, number] | number[];
+    );
 
-    const allowed = Number(reply?.[0] ?? 0) === 1;
-    const count = Number(reply?.[1] ?? 0);
+    if (!isRedisReply(reply) || !Array.isArray(reply)) {
+      return { allowed: false, count: 0 };
+    }
+
+    const allowed = Number(reply[0] ?? 0) === 1;
+    const count = Number(reply[1] ?? 0);
+
     return { allowed, count };
   }
 }

@@ -1,11 +1,14 @@
 import { QueryFailedError } from 'typeorm';
+import { isString } from '../common/utils/json-value';
 
-interface PgError {
-  code?: string;
+export function isUniqueViolation(error: unknown): error is QueryFailedError {
+  return error instanceof QueryFailedError && isPostgresUnique(error.driverError);
 }
 
-export function isUniqueViolation(error: unknown): boolean {
-  if (!(error instanceof QueryFailedError)) return false;
-  const driverError = (error as QueryFailedError & { driverError?: PgError }).driverError;
-  return driverError?.code === '23505';
+function isPostgresUnique(error: Error): boolean {
+  return hasStringCode(error) && error.code === '23505';
+}
+
+function hasStringCode(error: Error): error is Error & { code: string } {
+  return 'code' in error && isString(error.code);
 }

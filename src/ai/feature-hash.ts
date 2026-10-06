@@ -45,8 +45,9 @@ const STOPWORDS = new Set([
 ]);
 
 export function featureHashEmbedding(text: string, dimension: number): number[] {
-  const vector = new Array<number>(dimension).fill(0);
+  const vector = Array.from({ length: dimension }, () => 0);
   const tokens = contentTokens(text);
+
   if (tokens.length === 0) {
     accumulate(vector, text.toLowerCase(), 1);
   } else {
@@ -55,6 +56,7 @@ export function featureHashEmbedding(text: string, dimension: number): number[] 
       accumulate(vector, `${token}#2`, 0.35);
     }
   }
+
   return l2Normalize(vector);
 }
 
@@ -63,21 +65,27 @@ function contentTokens(text: string): string[] {
   const tokens = aliased.split(/[^\p{L}\p{N}]+/u);
   const unique: string[] = [];
   const seen = new Set<string>();
+
   for (const token of tokens) {
     if (token.length === 0 || STOPWORDS.has(token)) continue;
+
     if (token.length < 2 && token !== '비') continue;
+
     if (seen.has(token)) continue;
     seen.add(token);
     unique.push(token);
   }
+
   return unique;
 }
 
 function applyAliases(text: string): string {
   let value = text;
+
   for (const [from, to] of TOKEN_ALIASES) {
     value = value.replaceAll(from, to);
   }
+
   return value;
 }
 
@@ -90,9 +98,11 @@ function accumulate(vector: number[], token: string, weight: number): void {
 
 function fnv1a(input: string): number {
   let hash = 0x811c9dc5;
+
   for (let index = 0; index < input.length; index += 1) {
     hash ^= input.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
+
   return hash >>> 0;
 }

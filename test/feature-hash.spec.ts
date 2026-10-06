@@ -7,6 +7,7 @@ describe('featureHashEmbedding', () => {
   const jacket = featureHashEmbedding('비 오는 날 입을 가벼운 자켓 추천해줘', DIM);
   const paraphrase = featureHashEmbedding('비오는 날 가벼운 재킷 추천', DIM);
   const keyboard = featureHashEmbedding('기계식 키보드 스위치 추천', DIM);
+
   const product = featureHashEmbedding(
     '라이트 레인 자켓. 비 오는 날 입기 좋은 가벼운 방수 자켓. outer. 자켓 비 가벼운 방수',
     DIM,

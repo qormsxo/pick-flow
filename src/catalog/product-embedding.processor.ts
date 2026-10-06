@@ -22,8 +22,10 @@ export class ProductEmbeddingProcessor extends WorkerHost {
 
   async process(job: Job<ProductEmbeddingJob>): Promise<void> {
     const product = await this.products.findById(job.data.productId);
+
     if (!product) {
       this.logger.warn(`Skip embedding, product missing: ${job.data.productId}`);
+
       return;
     }
 

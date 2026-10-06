@@ -24,8 +24,9 @@ export class LoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => write('ok')),
-      catchError((error: unknown) => {
+      catchError((error) => {
         write('error');
+
         return throwError(() => error);
       }),
     );

@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { JsonObject } from '../common/utils/json-value';
 import { EventType } from './event-type.enum';
 
 @Entity('user_events')
@@ -17,7 +18,7 @@ export class UserEventEntity {
   type!: EventType;
 
   @Column({ type: 'jsonb', default: {} })
-  metadata!: Record<string, unknown>;
+  metadata!: JsonObject;
 
   @Column({ type: 'varchar', length: 64, unique: true })
   clientEventId!: string;

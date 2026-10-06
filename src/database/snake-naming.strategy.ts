@@ -15,6 +15,7 @@ export class SnakeNamingStrategy extends DefaultNamingStrategy implements Naming
 
   override columnName(propertyName: string, customName: string | undefined, embeddedPrefixes: string[]): string {
     const name = customName ?? propertyName;
+
     return snakeCase([...embeddedPrefixes, name].filter(Boolean).join('_'));
   }
 

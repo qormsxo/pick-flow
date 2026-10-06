@@ -23,11 +23,13 @@ export function rankPopularity(
   limit: number,
 ): string[] {
   const totals = new Map<string, number>();
+
   for (const day of days) {
     for (const row of day.rows) {
       totals.set(row.member, (totals.get(row.member) ?? 0) + decayedScore(row.score, day.ageDays));
     }
   }
+
   return [...totals.entries()]
     .sort((left, right) => right[1] - left[1])
     .slice(0, limit)

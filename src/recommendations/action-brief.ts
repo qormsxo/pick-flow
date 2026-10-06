@@ -18,6 +18,7 @@ export interface ActionBrief {
 }
 
 const MAX_LINES = 8;
+
 const DESCRIPTION_LIMIT = 80;
 
 /**
@@ -30,8 +31,10 @@ export function buildActionBrief(events: BriefEvent[], products: Map<string, Bri
   for (const event of events) {
     const product = products.get(event.productId);
     const weight = EVENT_WEIGHT[event.type];
+
     if (!product || weight == null) continue;
     const current = strongest.get(product.id);
+
     if (!current || weight > current.weight) {
       strongest.set(product.id, { weight, type: event.type, product });
     }
@@ -46,6 +49,7 @@ export function buildActionBrief(events: BriefEvent[], products: Map<string, Bri
     text: lines
       .map((line) => {
         const description = line.product.description.replace(/\s+/g, ' ').trim().slice(0, DESCRIPTION_LIMIT);
+
         return `- ${line.type} | ${line.product.name} | ${line.product.category} | ${description}`;
       })
       .join('\n'),

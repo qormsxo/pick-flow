@@ -16,6 +16,7 @@ export class ProductsRepository extends BaseRepository<ProductEntity> {
 
   findByIds(ids: string[]): Promise<ProductEntity[]> {
     if (ids.length === 0) return Promise.resolve([]);
+
     return this.repository.find({ where: { id: In(ids) } });
   }
 
@@ -34,6 +35,7 @@ export class ProductsRepository extends BaseRepository<ProductEntity> {
       skip: (page - 1) * limit,
       take: limit,
     });
+
     return { items, total };
   }
 

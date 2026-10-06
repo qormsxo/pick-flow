@@ -1,3 +1,3 @@
-export function isDuplicateJobError(error: unknown): boolean {
-  return error instanceof Error && /exist/i.test(error.message);
+export function isDuplicateJobError(error: Error): boolean {
+  return /exist/i.test(error.message);
 }

@@ -19,16 +19,16 @@ export class RecommendationsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: '취향과 가까운 상품을 추천한다. 취향이 없으면 인기 상품' })
+  @ApiOperation({ summary: '취향 좌표로 후보를 고른 뒤 AI가 순서를 다시 매긴다. 취향이 없으면 인기 상품' })
   list(@CurrentUser() user: AuthUser, @Query() query: RecommendationQueryDto) {
     return this.recommendations.recommend(user.userId, query.limit ?? 10);
   }
 
   @RateLimit(30, 60)
   @Get('insight')
-  @ApiOperation({ summary: '최근 행동이 어떤 쇼핑인지 알려 준다. 비슷한 행동이면 저장된 답을 쓴다' })
+  @ApiOperation({ summary: '검색된 상품 태그로 어떤 쇼핑인지 알려 준다. 같은 태그면 저장된 답을 쓴다' })
   insightForUser(@CurrentUser() user: AuthUser) {
-    return this.insight.describe(user.userId);
+    return this.recommendations.explain(user.userId);
   }
 
   @Get('cache/stats')

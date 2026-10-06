@@ -21,7 +21,9 @@ export class AiModule {
           inject: [ConfigService],
           useFactory: (config: ConfigService): AiProvider => {
             const provider = config.get<string>('ai.provider');
+
             if (provider === 'gemini') return new GeminiProvider(config);
+
             return new FakeAiProvider(config);
           },
         },

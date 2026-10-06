@@ -18,7 +18,7 @@ export interface BuiltProfile {
 export function buildProfile(signals: ProfileSignal[], dimension: number): BuiltProfile | null {
   if (signals.length === 0) return null;
 
-  const accumulator = new Array<number>(dimension).fill(0);
+  const accumulator = Array.from({ length: dimension }, () => 0);
   const categories: Record<string, number> = {};
 
   for (const signal of signals) {
@@ -30,6 +30,7 @@ export function buildProfile(signals: ProfileSignal[], dimension: number): Built
 
   const total = Object.values(categories).reduce((sum, value) => sum + value, 0);
   const categoryWeights: Record<string, number> = {};
+
   if (total > 0) {
     for (const [category, value] of Object.entries(categories)) {
       categoryWeights[category] = Number((value / total).toFixed(4));

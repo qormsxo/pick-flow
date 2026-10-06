@@ -9,7 +9,7 @@ export class InMemoryVectorStore implements VectorStore {
   }
 
   async dropIndex(spec: VectorIndexSpec): Promise<void> {
-    for (const key of [...this.docs.keys()]) {
+    for (const key of this.docs.keys()) {
       if (key.startsWith(spec.prefix)) this.docs.delete(key);
     }
   }
@@ -23,6 +23,7 @@ export class InMemoryVectorStore implements VectorStore {
 
   async search(spec: VectorIndexSpec, embedding: number[], k: number): Promise<VectorHit[]> {
     const hits: VectorHit[] = [];
+
     for (const [key, doc] of this.docs) {
       if (!key.startsWith(spec.prefix)) continue;
       const similarity = cosineSimilarity(embedding, doc.embedding);
@@ -33,7 +34,9 @@ export class InMemoryVectorStore implements VectorStore {
         fields: doc.fields,
       });
     }
+
     hits.sort((left, right) => right.similarity - left.similarity);
+
     return hits.slice(0, k);
   }
 }

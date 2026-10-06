@@ -16,6 +16,7 @@ export class RedisVectorStore implements VectorStore {
       this.logger.log(`Created vector index ${spec.name} dim=${spec.dimension}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+
       if (/exist/i.test(message)) return;
       throw error;
     }
@@ -27,13 +28,17 @@ export class RedisVectorStore implements VectorStore {
         `Embedding dim ${doc.embedding.length} does not match index ${spec.name} dim ${spec.dimension}`,
       );
     }
+
     const key = `${spec.prefix}${doc.id}`;
     const args: Array<string | Buffer> = [key];
+
     for (const [field, value] of Object.entries(doc.fields)) {
       args.push(field, value);
     }
+
     args.push('embedding', toFloat32Buffer(doc.embedding));
     await this.redis.command('HSET', args);
+
     if (ttlSec && ttlSec > 0) {
       await this.redis.command('EXPIRE', [key, ttlSec]);
     }
@@ -42,6 +47,7 @@ export class RedisVectorStore implements VectorStore {
   async search(spec: VectorIndexSpec, embedding: number[], k: number): Promise<VectorHit[]> {
     if (k < 1) return [];
     const returnFields = ['dist', ...spec.storedTextFields, ...spec.tagFields, ...spec.numericFields];
+
     const args: Array<string | number | Buffer> = [
       spec.name,
       '*=>[KNN $k @embedding $vec AS dist]',
@@ -62,7 +68,9 @@ export class RedisVectorStore implements VectorStore {
       0,
       k,
     ];
+
     const reply = await this.redis.command('FT.SEARCH', args);
+
     return parseSearchReply(reply, spec.prefix);
   }
 
@@ -71,6 +79,7 @@ export class RedisVectorStore implements VectorStore {
       await this.redis.command('FT.DROPINDEX', [spec.name, 'DD']);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+
       if (/unknown index/i.test(message) || /no such index/i.test(message)) return;
       throw error;
     }
@@ -100,15 +109,19 @@ export class RedisVectorStore implements VectorStore {
       'EF_CONSTRUCTION',
       200,
     ];
+
     for (const field of spec.storedTextFields) {
       args.push(field, 'TEXT', 'NOINDEX');
     }
+
     for (const field of spec.tagFields) {
       args.push(field, 'TAG');
     }
+
     for (const field of spec.numericFields) {
       args.push(field, 'NUMERIC');
     }
+
     return args;
   }
 }

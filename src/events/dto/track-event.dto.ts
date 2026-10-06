@@ -1,4 +1,5 @@
 import { IsEnum, IsObject, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { JsonObject } from '../../common/utils/json-value';
 import { EventType } from '../event-type.enum';
 
 export class TrackEventDto {
@@ -16,5 +17,5 @@ export class TrackEventDto {
 
   @IsOptional()
   @IsObject()
-  metadata?: Record<string, unknown>;
+  metadata?: JsonObject;
 }

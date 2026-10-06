@@ -62,6 +62,7 @@ export class ProductIndexService implements OnModuleInit {
 
   async search(embedding: number[], k: number): Promise<IndexedProduct[]> {
     const hits = await this.vectors.search(this.spec, embedding, k);
+
     return hits.map((hit) => ({
       id: hit.id,
       name: hit.fields.name ?? '',

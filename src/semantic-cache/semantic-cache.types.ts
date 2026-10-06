@@ -5,6 +5,8 @@ export interface SemanticPayload {
   completionTokens: number;
   estimatedCostUsd: number;
   groundedProductIds: string[];
+  /** AI가 돌려준 문장을 임베딩한 값. 상품 목록은 이 좌표로 다시 검색한다. */
+  searchVector?: number[];
 }
 
 export type SemanticMatch = 'exact' | 'semantic' | 'coalesced' | 'generated';

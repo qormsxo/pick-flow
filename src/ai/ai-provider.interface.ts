@@ -21,4 +21,6 @@ export interface AiProvider {
   readonly name: string;
   embed(text: string): Promise<AiEmbedding>;
   complete(prompt: string): Promise<AiCompletion>;
+  /** 후보 재정렬처럼 JSON 배열만 받아야 할 때 쓴다. */
+  completeJson(systemPrompt: string, prompt: string): Promise<AiCompletion>;
 }

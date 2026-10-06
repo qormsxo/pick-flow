@@ -5,8 +5,12 @@ import { isDuplicateJobError } from '../common/utils/duplicate-job';
 import { QUEUE_PROFILE_REFRESH, QUEUE_USER_EVENTS, PROFILE_WINDOW_MS } from '../queue/queue.constants';
 import { ProfileRefreshJob, UserEventJob } from './event-jobs';
 
+export interface EventSink {
+  enqueue(job: UserEventJob): Promise<void>;
+}
+
 @Injectable()
-export class EventProducer {
+export class EventProducer implements EventSink {
   constructor(
     @InjectQueue(QUEUE_USER_EVENTS) private readonly events: Queue<UserEventJob>,
     @InjectQueue(QUEUE_PROFILE_REFRESH) private readonly profiles: Queue<ProfileRefreshJob>,
@@ -29,6 +33,7 @@ export class EventProducer {
   async enqueueProfileRefresh(userId: string): Promise<void> {
     const bucket = Math.floor(Date.now() / PROFILE_WINDOW_MS);
     const delay = Math.max(300, (bucket + 1) * PROFILE_WINDOW_MS - Date.now());
+
     try {
       await this.profiles.add(
         'refresh',
@@ -43,7 +48,7 @@ export class EventProducer {
         },
       );
     } catch (error) {
-      if (isDuplicateJobError(error)) return;
+      if (error instanceof Error && isDuplicateJobError(error)) return;
       throw error;
     }
   }

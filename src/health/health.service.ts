@@ -22,6 +22,7 @@ export class HealthService {
 
   async check(): Promise<HealthReport> {
     const [postgres, redis] = await Promise.all([this.pingPostgres(), this.redis.ping().catch(() => false)]);
+
     return {
       status: postgres && redis ? 'ok' : 'degraded',
       postgres,
@@ -34,6 +35,7 @@ export class HealthService {
   private async pingPostgres(): Promise<boolean> {
     try {
       await this.dataSource.query('SELECT 1');
+
       return true;
     } catch {
       return false;

@@ -3,15 +3,21 @@ import { check, sleep } from 'k6';
 import { Counter } from 'k6/metrics';
 
 const baseUrl = __ENV.BASE_URL || 'http://localhost:3000';
+
 const password = 'Demo1234!';
 
 const cacheHits = new Counter('semantic_cache_hits');
+
 const generated = new Counter('semantic_cache_generated');
+
 const eventsAccepted = new Counter('events_accepted');
+
 const productsQueued = new Counter('products_queued');
 
 const eventTypes = ['VIEW', 'CLICK', 'LIKE', 'CART', 'PURCHASE'];
+
 const categories = ['outer', 'electronics', 'living', 'shoes', 'accessory'];
+
 const limits = [3, 5, 10];
 
 const shopperAccounts = [
@@ -54,7 +60,9 @@ export const options = {
 
 function jsonHeaders(token) {
   const headers = { 'Content-Type': 'application/json' };
+
   if (token) headers.Authorization = `Bearer ${token}`;
+
   return headers;
 }
 
@@ -64,6 +72,7 @@ function accessToken(email, displayName, secret) {
     JSON.stringify({ email, password: secret }),
     { headers: jsonHeaders() },
   );
+
   if (res.status !== 200) {
     res = http.post(
       `${baseUrl}/api/v1/auth/register`,
@@ -71,14 +80,18 @@ function accessToken(email, displayName, secret) {
       { headers: jsonHeaders() },
     );
   }
+
   const token = res.json('data.accessToken');
+
   if (!token) throw new Error(`계정 준비 실패 ${email} status=${res.status} body=${res.body}`);
+
   return token;
 }
 
 export function setup() {
   const healthRes = http.get(`${baseUrl}/api/v1/health`);
   const health = healthRes.json('data');
+
   if (healthRes.status !== 200 || !health || health.aiProvider !== 'fake' || health.loadTest !== true) {
     throw new Error('npm run start:load 로 서버를 띄우세요. 부하 테스트는 Fake AI와 LOAD_TEST=true 에서만 실행됩니다.');
   }
@@ -89,6 +102,7 @@ export function setup() {
   const productsRes = http.get(`${baseUrl}/api/v1/products?limit=20`);
   const items = productsRes.json('data.items') || [];
   const productIds = items.map((item) => item.id).filter(Boolean);
+
   if (productsRes.status !== 200 || productIds.length === 0) {
     throw new Error('상품이 없습니다. npm run seed 를 먼저 실행하세요.');
   }
@@ -112,6 +126,7 @@ export function trackEvents(data) {
     }),
     { headers },
   );
+
   if (check(eventRes, { 'event accepted': (res) => res.status === 202 })) {
     eventsAccepted.add(1, { type });
   }
@@ -123,20 +138,25 @@ export function trackEvents(data) {
 
 export function readInsights(data) {
   const token = data.shoppers[__VU % data.shoppers.length];
+
   const insightRes = http.get(`${baseUrl}/api/v1/recommendations/insight`, {
     headers: jsonHeaders(token),
   });
+
   if (check(insightRes, { 'insight ok': (res) => res.status === 200 })) {
     const match = insightRes.json('data.match');
+
     if (match === 'generated') generated.add(1);
     else if (match && match !== 'skipped') cacheHits.add(1);
   }
+
   sleep(0.2);
 }
 
 export function publishProduct(data) {
   const category = categories[(__VU + __ITER) % categories.length];
   const sku = `K6-${data.runId}-${__VU}-${__ITER}`;
+
   const res = http.post(
     `${baseUrl}/api/v1/products`,
     JSON.stringify({
@@ -149,8 +169,10 @@ export function publishProduct(data) {
     }),
     { headers: jsonHeaders(data.adminToken) },
   );
+
   if (check(res, { 'product queued': (response) => response.status === 201 || response.status === 200 })) {
     productsQueued.add(1, { category });
   }
+
   sleep(0.05);
 }

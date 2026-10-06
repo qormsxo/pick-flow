@@ -7,6 +7,7 @@ const coat: BriefProduct = {
   category: 'outer',
   description: '비 오는 날 가볍게 걸치는 방수 코트',
 };
+
 const tumbler: BriefProduct = {
   id: 'tumbler',
   name: '텀블러',

@@ -27,6 +27,7 @@ export class ProfileRefreshProcessor extends WorkerHost {
 
   async process(job: Job<ProfileRefreshJob>): Promise<void> {
     const events = await this.events.findRecentByUser(job.data.userId, RECENT_EVENT_LIMIT);
+
     if (events.length === 0) return;
 
     const products = await this.products.findByIds([...new Set(events.map((event) => event.productId))]);
@@ -36,10 +37,13 @@ export class ProfileRefreshProcessor extends WorkerHost {
 
     const signals = events.flatMap((event) => {
       const product = byId.get(event.productId);
+
       if (!product?.embedding?.length) {
         missingEmbeddings += 1;
+
         return [];
       }
+
       return [
         {
           embedding: product.embedding,
@@ -54,10 +58,12 @@ export class ProfileRefreshProcessor extends WorkerHost {
       if (missingEmbeddings > 0) {
         throw new Error(`Embeddings not ready for user ${job.data.userId}`);
       }
+
       return;
     }
 
     const profile = buildProfile(signals, signals[0].embedding.length);
+
     if (!profile) return;
 
     await this.preferences.upsert({

@@ -1,3 +1,4 @@
+import { JsonObject } from '../common/utils/json-value';
 import { EventType } from './event-type.enum';
 
 export interface UserEventJob {
@@ -5,7 +6,7 @@ export interface UserEventJob {
   userId: string;
   productId: string;
   type: EventType;
-  metadata: Record<string, unknown>;
+  metadata: JsonObject;
   occurredAt: string;
 }
 

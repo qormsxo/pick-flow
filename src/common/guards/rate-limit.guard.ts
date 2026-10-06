@@ -26,6 +26,7 @@ export class RateLimitGuard implements CanActivate {
     if (this.config.get<boolean>('app.loadTest')) return true;
 
     const rule = this.reflector.get<RateLimitRule | undefined>(RATE_LIMIT_KEY, context.getHandler());
+
     if (!rule) return true;
 
     const request = context.switchToHttp().getRequest<Request & { user?: AuthUser }>();
@@ -34,9 +35,11 @@ export class RateLimitGuard implements CanActivate {
 
     try {
       const result = await this.redis.hitRateLimit(key, rule.limit, rule.windowSec);
+
       if (!result.allowed) {
         throw new HttpException('Rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
       }
+
       return true;
     } catch (error) {
       if (error instanceof HttpException) throw error;

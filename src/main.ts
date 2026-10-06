@@ -30,6 +30,7 @@ async function bootstrap(): Promise<void> {
         .addBearerAuth()
         .build(),
     );
+
     SwaggerModule.setup('docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
     });

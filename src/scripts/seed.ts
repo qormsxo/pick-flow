@@ -42,35 +42,42 @@ async function main(): Promise<void> {
 
     for (const product of SEED_PRODUCTS) {
       const existing = await products.findBySku(product.sku);
+
       if (existing) continue;
       await catalog.create(product);
       logger.log(`Queued embedding for ${product.sku}`);
     }
 
     const pending = (await products.findAll()).filter((item) => !item.embeddingReady);
+
     if (pending.length > 0) {
       await catalog.reindexAll();
     }
 
     const deadline = Date.now() + 20_000;
+
     while (Date.now() < deadline) {
       const all = await products.findAll();
       const ready = all.filter((item) => item.embeddingReady).length;
+
       if (all.length >= SEED_PRODUCTS.length && ready === all.length) {
         logger.log(`Seed complete. products=${all.length} embeddings=${ready}`);
         logger.log('demo login: demo@pickflow.dev / Demo1234!');
         logger.log('admin login: admin@pickflow.dev / Admin1234!');
+
         return;
       }
+
       await sleep(250);
     }
+
     throw new Error('Timed out waiting for product embeddings. Is Redis Stack running?');
   } finally {
     await app.close();
   }
 }
 
-void main().catch((error: unknown) => {
+void main().catch((error) => {
   console.error(error);
   process.exit(1);
 });

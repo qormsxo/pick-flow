@@ -1,6 +1,7 @@
 import { ConsoleLogger, LogLevel } from '@nestjs/common';
 import { appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { isJsonValue, isString } from '../utils/json-value';
 
 const LEVELS: LogLevel[] = ['error', 'warn', 'log', 'debug', 'verbose', 'fatal'];
 
@@ -22,19 +23,21 @@ export class FileLogger extends ConsoleLogger {
     context?: string,
     logLevel?: LogLevel,
     writeStreamType?: 'stdout' | 'stderr',
-    errorStack?: unknown,
+    errorStack?: string,
   ): void {
     super.printMessages(messages, context, logLevel, writeStreamType, errorStack);
     const level = (logLevel ?? 'log').toUpperCase().padStart(7, ' ');
     const ctx = context ? `[${context}] ` : '';
+
     for (const message of messages) {
-      const text = typeof message === 'string' ? message : safeStringify(message);
+      const text = isString(message) ? message : isJsonValue(message) ? JSON.stringify(message) : String(message);
       this.append(`${new Date().toISOString()} ${level} ${ctx}${text}`);
     }
   }
 
   protected printStackTrace(stack: string): void {
     super.printStackTrace(stack);
+
     if (stack) this.append(stack);
   }
 
@@ -43,10 +46,3 @@ export class FileLogger extends ConsoleLogger {
   }
 }
 
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}

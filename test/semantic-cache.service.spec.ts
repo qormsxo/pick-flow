@@ -1,6 +1,5 @@
 import { featureHashEmbedding } from '../src/ai/feature-hash';
 import { sleep } from '../src/common/utils/sleep.util';
-import { RedisService } from '../src/redis/redis.service';
 import { SemanticCacheService } from '../src/semantic-cache/semantic-cache.service';
 import { SemanticCacheOptions, SemanticPayload } from '../src/semantic-cache/semantic-cache.types';
 import { InMemoryVectorStore } from './support/in-memory-vector.store';
@@ -37,11 +36,9 @@ describe('SemanticCacheService', () => {
   function createService() {
     const vectors = new InMemoryVectorStore();
     const redis = new MemoryRedis();
-    const service = new SemanticCacheService(
-      vectors,
-      redis as unknown as RedisService,
-      options,
-    );
+
+    const service = new SemanticCacheService(vectors, redis, options);
+
     return { service, redis };
   }
 
@@ -49,11 +46,13 @@ describe('SemanticCacheService', () => {
     const { service } = createService();
     let embeddings = 0;
     const question = '비 오는 날 입을 가벼운 자켓 추천해줘';
+
     const run = () =>
       service.resolve({
         text: question,
         embed: async () => {
           embeddings += 1;
+
           return featureHashEmbedding(question, DIM);
         },
         compute: async () => payload('라이트 레인 자켓'),
@@ -71,12 +70,14 @@ describe('SemanticCacheService', () => {
   it('reuses a paraphrase through vector similarity and skips generation', async () => {
     const { service } = createService();
     let generations = 0;
+
     const resolve = (text: string) =>
       service.resolve({
         text,
         embed: async () => featureHashEmbedding(text, DIM),
         compute: async () => {
           generations += 1;
+
           return payload('라이트 레인 자켓');
         },
       });
@@ -92,6 +93,7 @@ describe('SemanticCacheService', () => {
 
   it('does not reuse an unrelated question', async () => {
     const { service } = createService();
+
     const resolve = (text: string) =>
       service.resolve({
         text,
@@ -108,6 +110,7 @@ describe('SemanticCacheService', () => {
     const { service } = createService();
     let generations = 0;
     const text = '비 오는 날 입을 가벼운 자켓 추천해줘';
+
     const run = () =>
       service.resolve({
         text,
@@ -115,6 +118,7 @@ describe('SemanticCacheService', () => {
         compute: async () => {
           generations += 1;
           await sleep(40);
+
           return payload('라이트 레인 자켓');
         },
       });

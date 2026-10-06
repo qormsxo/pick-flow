@@ -29,7 +29,9 @@ export class CatalogService {
         embedding: null,
         embeddingReady: false,
       });
+
       await this.enqueueEmbedding(saved.id);
+
       return toProductView(saved);
     } catch (error) {
       if (isUniqueViolation(error)) throw new ConflictException('SKU already exists');
@@ -39,6 +41,7 @@ export class CatalogService {
 
   async list(page = 1, limit = 20, category?: string): Promise<PageResult<ProductView>> {
     const result = await this.products.paginate(page, limit, category);
+
     return {
       items: result.items.map(toProductView),
       page,
@@ -49,33 +52,41 @@ export class CatalogService {
 
   async getById(id: string): Promise<ProductView> {
     const product = await this.products.findById(id);
+
     if (!product) throw new NotFoundException('Product not found');
+
     return toProductView(product);
   }
 
   /** 공급자나 차원을 바꾼 뒤 서빙 인덱스를 다시 채울 때 쓴다. */
   async reindexAll(): Promise<number> {
     const products = await this.products.findAll();
+
     for (const product of products) {
       await this.enqueueEmbedding(product.id, true);
     }
+
     return products.length;
   }
 
   private async enqueueEmbedding(productId: string, force = false): Promise<void> {
     const jobId = `embed-${productId}`;
+
     if (force) {
       const existing = await this.embeddings.getJob(jobId);
+
       if (existing) {
         try {
           await existing.remove();
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+
           if (/locked/i.test(message)) return;
           throw error;
         }
       }
     }
+
     try {
       await this.embeddings.add(
         'embed',
@@ -89,7 +100,7 @@ export class CatalogService {
         },
       );
     } catch (error) {
-      if (isDuplicateJobError(error)) return;
+      if (error instanceof Error && isDuplicateJobError(error)) return;
       throw error;
     }
   }

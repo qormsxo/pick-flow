@@ -12,11 +12,7 @@ export const envValidationSchema = Joi.object({
   AI_PROVIDER: Joi.string().valid('fake', 'gemini').default('fake'),
   AI_FAKE_LATENCY_MS: Joi.number().integer().min(0).max(5_000).default(20),
   AI_FAKE_CHAT_LATENCY_MS: Joi.number().integer().min(0).max(15_000).default(1_200),
-  GEMINI_API_KEY: Joi.string().allow('').when('AI_PROVIDER', {
-    is: 'gemini',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
+  GEMINI_API_KEY: Joi.string().allow(''),
   GEMINI_CHAT_MODEL: Joi.string().default('gemini-2.5-flash'),
   GEMINI_EMBEDDING_MODEL: Joi.string().default('gemini-embedding-001'),
   EMBEDDING_DIM: Joi.number().integer().min(32).max(3072).default(384),
@@ -25,9 +21,28 @@ export const envValidationSchema = Joi.object({
   SEMANTIC_CACHE_TTL_SEC: Joi.number().integer().min(30).default(86_400),
   SEMANTIC_CACHE_TOP_K: Joi.number().integer().min(1).max(10).default(1),
   REQUEST_TIMEOUT_MS: Joi.number().integer().min(100).default(10_000),
-  LOAD_TEST: Joi.boolean()
-    .truthy('true', '1')
-    .falsy('false', '0', '')
-    .default(false)
-    .when('NODE_ENV', { is: 'production', then: Joi.valid(false) }),
+  LOAD_TEST: Joi.boolean().truthy('true', '1').falsy('false', '0', '').default(false),
+}).custom((value, helpers) => {
+  if (!isEnvRecord(value)) return value;
+
+  if (value.AI_PROVIDER === 'gemini' && value.GEMINI_API_KEY === undefined) {
+    return helpers.error('any.required');
+  }
+
+  if (value.NODE_ENV === 'production' && value.LOAD_TEST !== false) {
+    return helpers.error('any.only');
+  }
+
+  return value;
 });
+
+interface EnvRecord {
+  AI_PROVIDER?: string;
+  GEMINI_API_KEY?: string;
+  NODE_ENV?: string;
+  LOAD_TEST?: boolean;
+}
+
+function isEnvRecord(value: unknown): value is EnvRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

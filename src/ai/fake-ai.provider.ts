@@ -5,6 +5,7 @@ import { AiCompletion, AiEmbedding, AiProvider } from './ai-provider.interface';
 import { featureHashEmbedding } from './feature-hash';
 
 const EMBEDDING_MODEL = 'fake-hash-v1';
+
 const CHAT_MODEL = 'fake-chat-v1';
 
 @Injectable()
@@ -22,6 +23,7 @@ export class FakeAiProvider implements AiProvider {
 
   async embed(text: string): Promise<AiEmbedding> {
     await this.pause(this.embedLatencyMs);
+
     return {
       vector: featureHashEmbedding(text, this.dimension),
       model: EMBEDDING_MODEL,
@@ -31,16 +33,46 @@ export class FakeAiProvider implements AiProvider {
 
   async complete(prompt: string): Promise<AiCompletion> {
     await this.pause(this.chatLatencyMs);
-    const actions = [
-      ...prompt.matchAll(/^- (?:VIEW|CLICK|LIKE|CART|PURCHASE) \| (.+?) \| ([^|]+) \| (.+)$/gm),
-    ];
-    const lead = actions[0];
-    const name = lead?.[1]?.trim();
-    const text = name
-      ? `지금은 ${name}처럼 고르는 쇼핑입니다. 같은 쓰임새를 이어서 보면 됩니다.`
-      : '최근 행동이 없어 어떤 쇼핑인지 말하지 못했습니다.';
+    const retrieved = prompt.split('[retrieved]')[1] ?? '';
+    const kind = retrieved.match(/^- ([^|\n]+)/m)?.[1]?.trim();
+
+    const text = kind
+      ? `${kind} 종류를 고르는 쇼핑입니다. 같은 쓰임새를 이어서 보면 됩니다.`
+      : '검색된 상품이 없어 어떤 쇼핑인지 말하지 못했습니다.';
+
     const promptTokens = estimateTokens(prompt);
     const completionTokens = estimateTokens(text);
+
+    return {
+      text,
+      model: CHAT_MODEL,
+      promptTokens,
+      completionTokens,
+      estimatedCostUsd: 0,
+    };
+  }
+
+  async completeJson(_systemPrompt: string, prompt: string): Promise<AiCompletion> {
+    await this.pause(this.chatLatencyMs);
+    const block = prompt.split('[candidates]')[1] ?? '';
+    const picks: { product_id: string; rank: number; reason: string }[] = [];
+
+    for (const match of block.matchAll(/^- ([^|\n]+) \|/gm)) {
+      const productId = match[1]?.trim();
+
+      if (!productId) continue;
+      if (picks.length === 10) break;
+      picks.push({
+        product_id: productId,
+        rank: picks.length + 1,
+        reason: '취향 좌표와 가까운 후보입니다.',
+      });
+    }
+
+    const text = JSON.stringify(picks);
+    const promptTokens = estimateTokens(prompt);
+    const completionTokens = estimateTokens(text);
+
     return {
       text,
       model: CHAT_MODEL,

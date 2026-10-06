@@ -1,16 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  isJsonNumber,
+  isJsonObject,
+  isJsonString,
+  isNumberList,
+  JsonObject,
+  JsonValue,
+  readJson,
+} from '../common/utils/json-value';
 import { l2Normalize } from '../common/utils/vector.util';
 import { AiCompletion, AiEmbedding, AiProvider } from './ai-provider.interface';
 
 /** Gemini 2.5 Flash 텍스트 목록가 추정치. 청구서 대체가 아니라 캐시 절감액을 보여 주기 위한 값이다. */
 const CHAT_INPUT_USD_PER_TOKEN = 0.3 / 1_000_000;
+
 const CHAT_OUTPUT_USD_PER_TOKEN = 2.5 / 1_000_000;
 
 const SYSTEM_PROMPT = [
-  '너는 쇼핑몰 사용자의 최근 행동을 보고 어떤 쇼핑인지 말한다.',
-  '상품 이름을 다시 나열하지 않는다.',
-  '행동에 없는 상품 이름은 만들지 않는다.',
+  '너는 취향 태그만 보고 어떤 쇼핑인지 말한다.',
+  '상품 목록은 만들지 않는다.',
+  '태그 단어를 그대로 쓴다.',
+  '자켓을 아우터처럼 다른 말로 바꾸지 않는다.',
+  '상품 이름은 말하지 않는다.',
+  '목록에 없는 태그는 말하지 않는다.',
   '두 문장으로 답한다.',
 ].join(' ');
 
@@ -31,20 +44,22 @@ export class GeminiProvider implements AiProvider {
   }
 
   async embed(text: string): Promise<AiEmbedding> {
-    const body = await this.post<{
-      embedding?: { values?: number[] };
-    }>(`${this.embeddingModel}:embedContent`, {
+    const body = await this.post(`${this.embeddingModel}:embedContent`, {
       content: { parts: [{ text }] },
       embedContentConfig: { outputDimensionality: this.dimension },
     });
-    const values = body.embedding?.values;
+
+    const values = readEmbeddingValues(body);
+
     if (!values || values.length < this.dimension) {
       throw new Error(
         `Gemini embedding dim mismatch: expected at least ${this.dimension}, got ${values?.length ?? 0}`,
       );
     }
+
     // 3072보다 짧게 자르면 gemini-embedding-001 은 직접 정규화해야 코사인 비교가 맞다.
     const vector = l2Normalize(values.slice(0, this.dimension));
+
     return {
       vector,
       model: this.embeddingModel,
@@ -53,25 +68,34 @@ export class GeminiProvider implements AiProvider {
   }
 
   async complete(prompt: string): Promise<AiCompletion> {
-    const body = await this.post<{
-      modelVersion?: string;
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
-    }>(`${this.chatModel}:generateContent`, {
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    return this.generate(SYSTEM_PROMPT, prompt, false);
+  }
+
+  async completeJson(systemPrompt: string, prompt: string): Promise<AiCompletion> {
+    return this.generate(systemPrompt, prompt, true);
+  }
+
+  private async generate(systemPrompt: string, prompt: string, json: boolean): Promise<AiCompletion> {
+    const generationConfig: JsonObject = json
+      ? { temperature: 0.2, responseMimeType: 'application/json' }
+      : { temperature: 0.2 };
+
+    const body = await this.post(`${this.chatModel}:generateContent`, {
+      systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2 },
+      generationConfig,
     });
-    const text = body.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text ?? '')
-      .join('')
-      .trim();
+
+    const chat = readChat(body);
+    const text = chat.text.trim();
+
     if (!text) throw new Error('Gemini chat response was empty');
-    const promptTokens = body.usageMetadata?.promptTokenCount ?? estimateTokens(prompt);
-    const completionTokens = body.usageMetadata?.candidatesTokenCount ?? estimateTokens(text);
+    const promptTokens = chat.promptTokens ?? estimateTokens(prompt);
+    const completionTokens = chat.completionTokens ?? estimateTokens(text);
+
     return {
       text,
-      model: body.modelVersion ?? this.chatModel,
+      model: chat.model ?? this.chatModel,
       promptTokens,
       completionTokens,
       estimatedCostUsd: Number(
@@ -80,7 +104,7 @@ export class GeminiProvider implements AiProvider {
     };
   }
 
-  private async post<T>(action: string, payload: unknown): Promise<T> {
+  private async post(action: string, payload: JsonObject): Promise<JsonValue> {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${action}`,
       {
@@ -92,13 +116,71 @@ export class GeminiProvider implements AiProvider {
         body: JSON.stringify(payload),
       },
     );
+
     if (!response.ok) {
       const detail = await response.text();
       this.logger.error(`Gemini ${action} failed: ${response.status} ${detail}`);
       throw new Error(`Gemini ${action} failed with ${response.status}`);
     }
-    return (await response.json()) as T;
+
+    const body = readJson(await response.text());
+
+    if (body === undefined) throw new Error(`Gemini ${action} returned invalid JSON`);
+
+    return body;
   }
+}
+
+function readEmbeddingValues(body: JsonValue): number[] | null {
+  if (!isJsonObject(body)) return null;
+
+  const embedding = body.embedding;
+
+  if (!isJsonObject(embedding)) return null;
+
+  return isNumberList(embedding.values) ? embedding.values : null;
+}
+
+interface GeminiChat {
+  text: string;
+  model?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
+function readChat(body: JsonValue): GeminiChat {
+  if (!isJsonObject(body)) return { text: '' };
+
+  const model = isJsonString(body.modelVersion) ? body.modelVersion : undefined;
+  const usage = isJsonObject(body.usageMetadata) ? body.usageMetadata : undefined;
+
+  return {
+    text: readCandidateText(body.candidates),
+    model,
+    promptTokens: usage && isJsonNumber(usage.promptTokenCount) ? usage.promptTokenCount : undefined,
+    completionTokens: usage && isJsonNumber(usage.candidatesTokenCount) ? usage.candidatesTokenCount : undefined,
+  };
+}
+
+function readCandidateText(value: JsonValue | undefined): string {
+  if (!Array.isArray(value)) return '';
+
+  const first = value[0];
+
+  if (!isJsonObject(first)) return '';
+
+  const content = first.content;
+
+  if (!isJsonObject(content) || !Array.isArray(content.parts)) return '';
+
+  const texts: string[] = [];
+
+  for (const part of content.parts) {
+    if (!isJsonObject(part) || !isJsonString(part.text)) continue;
+    texts.push(part.text);
+  }
+
+  return texts.join('');
 }
 
 function estimateTokens(text: string): number {

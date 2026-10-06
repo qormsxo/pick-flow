@@ -12,6 +12,7 @@ export class PopularityService {
     await this.redis.zincrby(key, weight, productId);
     await this.redis.expire(key, HOT_WINDOW_SEC);
     const size = await this.redis.zcard(key);
+
     if (size > POPULARITY_DAY_CAP) {
       await this.redis.zremrangebyrank(key, 0, size - POPULARITY_DAY_CAP - 1);
     }
@@ -24,6 +25,7 @@ export class PopularityService {
         rows: await this.redis.zrangeWithScores(key, 0, -1),
       })),
     );
+
     return rankPopularity(days, limit);
   }
 }

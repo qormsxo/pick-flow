@@ -26,9 +26,11 @@ export class UserEventProcessor extends WorkerHost {
 
   async process(job: Job<UserEventJob>): Promise<void> {
     const existing = await this.events.findByClientEventId(job.data.clientEventId);
+
     if (existing) return;
 
     const product = await this.products.findById(job.data.productId);
+
     if (!product) {
       throw new UnrecoverableError(`Unknown product ${job.data.productId}`);
     }
@@ -43,6 +45,7 @@ export class UserEventProcessor extends WorkerHost {
     });
 
     await this.popularity.add(product.id, EVENT_WEIGHT[job.data.type], new Date(job.data.occurredAt));
+
     if (product.embedding?.length) {
       await this.index.upsert({
         id: product.id,
@@ -54,6 +57,7 @@ export class UserEventProcessor extends WorkerHost {
         embedding: product.embedding,
       });
     }
+
     await this.producer.enqueueProfileRefresh(job.data.userId);
   }
 
