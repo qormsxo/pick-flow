@@ -48,6 +48,7 @@ export class AuthService {
     return this.issue(user.id, user.email, user.displayName, user.role);
   }
 
+  /** 로그인에 쓸 JWT를 만들고 사용자 정보를 같이 돌려준다. */
   private async issue(id: string, email: string, displayName: string, role: UserRole): Promise<AuthResult> {
     const accessToken = await this.jwt.signAsync({ sub: id, email, role });
 

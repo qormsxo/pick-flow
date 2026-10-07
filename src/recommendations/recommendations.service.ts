@@ -60,6 +60,7 @@ export class RecommendationsService {
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
+  /** 60초 안에 만든 목록이 있으면 그대로 돌려준다. 없으면 한 명씩 잠그고 새로 만든다. */
   async recommend(userId: string, limit: number): Promise<RecommendationResult> {
     const started = Date.now();
     const cacheKey = `rec:${userId}:${limit}`;
@@ -105,12 +106,14 @@ export class RecommendationsService {
     return { ...built, cacheHit, tookMs: Date.now() - started };
   }
 
+  /** 후보 40개를 거른 뒤 Gemini가 최대 10개의 순위와 이유를 정한다. 실패하면 좌표 순서를 쓴다. */
   private async build(userId: string, limit: number): Promise<CachedRecommendations> {
     const finalLimit = Math.min(limit, FINAL_LIMIT);
     const taste = await this.tasteHits(userId, CANDIDATE_LIMIT);
 
     if (taste.length === 0) return this.popular(finalLimit);
 
+    // 후보 40개를 거른다.
     const candidates = await this.filterCandidates(userId, taste);
 
     if (candidates.length === 0) return this.popular(finalLimit);
@@ -135,6 +138,7 @@ export class RecommendationsService {
     }
   }
 
+  /** Redis에 없으면 Postgres의 취향 좌표를 읽고 14일 동안 저장한다. */
   private async loadVector(userId: string): Promise<number[] | null> {
     const cached = await this.redis.getJson(USER_VECTOR_KEY(userId));
 
@@ -148,6 +152,7 @@ export class RecommendationsService {
     return preference.interestVector;
   }
 
+  /** 취향 좌표로 찾은 상품 태그로 어떤 쇼핑인지 문장만 만든다. 목록은 여기서 고르지 않는다. */
   async explain(userId: string): Promise<TasteInsight> {
     const taste = await this.tasteHits(userId, 5);
 
@@ -163,11 +168,15 @@ export class RecommendationsService {
 
   /** 재고 컬럼과 제외 카테고리 설정은 없다. 구매한 상품과 좌표가 없는 상품만 뺀다. */
   private async filterCandidates(userId: string, hits: IndexedProduct[]): Promise<RankedCandidate[]> {
-    const purchased = new Set(await this.events.findProductIds(userId, EventType.PURCHASE));
-    const rows = await this.products.findByIds(hits.map((hit) => hit.id));
-    const byId = new Map(rows.map((product) => [product.id, product]));
-    const candidates: RankedCandidate[] = [];
 
+    const purchased = new Set(await this.events.findProductIds(userId, EventType.PURCHASE));
+
+    const rows = await this.products.findByIds(hits.map((hit) => hit.id));
+
+    const byId = new Map(rows.map((product) => [product.id, product]));
+
+    const candidates: RankedCandidate[] = [];
+    
     for (const hit of hits) {
       const product = byId.get(hit.id);
 
@@ -178,6 +187,7 @@ export class RecommendationsService {
     return candidates;
   }
 
+  /** 행동 가중치와 최근 행동을 재정렬 프롬프트에 넣을 글로 만든다. */
   private async profileText(userId: string): Promise<string> {
     const preference = await this.preferences.findByUserId(userId);
     const events = await this.events.findRecentByUser(userId, PROFILE_EVENT_LIMIT);
@@ -199,6 +209,7 @@ export class RecommendationsService {
     return ['가중치: ' + legend.join(', '), '[profile]', weights.join(', ') || '(none)', '[actions]', brief.text || '(none)'].join('\n');
   }
 
+  /** 고른 id로 DB 상품을 다시 읽고 벡터 유사도와 이유를 붙인다. */
   private async itemsFromPicks(candidates: RankedCandidate[], picks: RerankPick[]): Promise<RecommendationItem[]> {
     const rows = await this.products.findByIds(picks.map((pick) => pick.productId));
     const byId = new Map(rows.map((product) => [product.id, product]));
@@ -236,6 +247,7 @@ export class RecommendationsService {
     }
   }
 
+  /** 취향 좌표가 없으면 최근 인기 순으로 돌려준다. */
   private async popular(limit: number): Promise<CachedRecommendations> {
     const ids = await this.popularity.top(limit);
     const products = await this.products.findByIds(ids);
@@ -263,6 +275,7 @@ export class RecommendationsService {
   }
 }
 
+/** 재정렬 결과가 비거나 실패하면 후보의 좌표 순서를 그대로 순위로 쓴다. */
 function vectorPicks(candidates: RankedCandidate[], limit: number): RerankPick[] {
   const picks: RerankPick[] = [];
 
@@ -278,13 +291,14 @@ function vectorPicks(candidates: RankedCandidate[], limit: number): RerankPick[]
   return picks;
 }
 
+/** 후보의 id와 이름과 분류와 유사도와 태그와 설명을 한 줄씩 만든다. */
 function candidateText(candidates: RankedCandidate[]): string {
   const lines: string[] = [];
 
   for (const candidate of candidates) {
     const description = candidate.product.description.replace(/\s+/g, ' ').trim().slice(0, 120);
     const tags = candidate.product.tags.join(', ');
-
+    // 후보의 id와 이름과 분류와 유사도와 태그와 설명을 한 줄씩 만든다.
     lines.push(
       `- ${candidate.product.id} | ${candidate.product.name} | ${candidate.product.category} | ${candidate.hit.similarity.toFixed(4)} | ${tags} | ${description}`,
     );

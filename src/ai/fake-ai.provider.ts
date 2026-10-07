@@ -21,6 +21,7 @@ export class FakeAiProvider implements AiProvider {
     this.chatLatencyMs = config.getOrThrow<number>('ai.fakeChatLatencyMs');
   }
 
+  /** 글을 해시해 384칸 좌표로 만든다. API 비용은 0이다. */
   async embed(text: string): Promise<AiEmbedding> {
     await this.pause(this.embedLatencyMs);
 
@@ -31,6 +32,7 @@ export class FakeAiProvider implements AiProvider {
     };
   }
 
+  /** 프롬프트의 첫 태그로 어떤 쇼핑인지 한 문장을 만든다. */
   async complete(prompt: string): Promise<AiCompletion> {
     await this.pause(this.chatLatencyMs);
     const retrieved = prompt.split('[retrieved]')[1] ?? '';
@@ -52,6 +54,7 @@ export class FakeAiProvider implements AiProvider {
     };
   }
 
+  /** 후보 id를 위에서부터 최대 10개 JSON으로 돌려준다. */
   async completeJson(_systemPrompt: string, prompt: string): Promise<AiCompletion> {
     await this.pause(this.chatLatencyMs);
     const block = prompt.split('[candidates]')[1] ?? '';

@@ -20,6 +20,7 @@ export class ProductEmbeddingProcessor extends WorkerHost {
     super();
   }
 
+  /** 이름 설명 카테고리 태그를 한 줄로 붙여 좌표를 만들고 Postgres와 Redis에 넣는다. */
   async process(job: Job<ProductEmbeddingJob>): Promise<void> {
     const product = await this.products.findById(job.data.productId);
 

@@ -15,6 +15,7 @@ export class UserEventsRepository extends BaseRepository<UserEventEntity> {
     return this.repository.findOne({ where: { clientEventId } });
   }
 
+  /** 그 사용자의 해당 행동에 나온 상품 id만 중복 없이 모은다. */
   async findProductIds(userId: string, type: EventType): Promise<string[]> {
     const rows = await this.repository.find({
       select: { productId: true },

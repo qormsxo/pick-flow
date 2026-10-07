@@ -25,6 +25,7 @@ export class ProfileRefreshProcessor extends WorkerHost {
     super();
   }
 
+  /** 최근 행동으로 취향 좌표를 다시 만들고, 그 사용자의 추천 캐시를 지운다. */
   async process(job: Job<ProfileRefreshJob>): Promise<void> {
     const events = await this.events.findRecentByUser(job.data.userId, RECENT_EVENT_LIMIT);
 

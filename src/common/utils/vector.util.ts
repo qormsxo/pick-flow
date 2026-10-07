@@ -1,3 +1,4 @@
+/** 벡터 길이를 1로 맞춰 코사인 비교가 내적과 같게 한다. */
 export function l2Normalize(values: number[]): number[] {
   let sum = 0;
 

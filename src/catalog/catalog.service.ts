@@ -17,6 +17,7 @@ export class CatalogService {
     @InjectQueue(QUEUE_PRODUCT_EMBEDDING) private readonly embeddings: Queue<ProductEmbeddingJob>,
   ) {}
 
+  /** 상품 글은 바로 저장하고 좌표는 큐에 맡긴다. */
   async create(dto: CreateProductDto): Promise<ProductView> {
     try {
       const saved = await this.products.save({
@@ -69,6 +70,7 @@ export class CatalogService {
     return products.length;
   }
 
+  /** 같은 상품의 좌표 작업은 jobId 가 같아 한 번만 돈다. force 면 기존 작업을 지우고 다시 넣는다. */
   private async enqueueEmbedding(productId: string, force = false): Promise<void> {
     const jobId = `embed-${productId}`;
 

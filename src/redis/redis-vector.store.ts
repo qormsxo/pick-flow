@@ -10,6 +10,7 @@ export class RedisVectorStore implements VectorStore {
 
   constructor(private readonly redis: RedisService) {}
 
+  /** 인덱스가 없으면 HNSW 코사인 인덱스를 만든다. 이미 있으면 넘어간다. */
   async ensureIndex(spec: VectorIndexSpec): Promise<void> {
     try {
       await this.redis.command('FT.CREATE', this.schemaArgs(spec));
@@ -22,6 +23,7 @@ export class RedisVectorStore implements VectorStore {
     }
   }
 
+  /** 좌표를 Float32로 넣어 해시에 저장하고 TTL을 건다. */
   async upsert(spec: VectorIndexSpec, doc: VectorDocument, ttlSec?: number): Promise<void> {
     if (doc.embedding.length !== spec.dimension) {
       throw new Error(
@@ -44,6 +46,7 @@ export class RedisVectorStore implements VectorStore {
     }
   }
 
+  /** KNN으로 가장 가까운 k개를 거리 순으로 가져온다. */
   async search(spec: VectorIndexSpec, embedding: number[], k: number): Promise<VectorHit[]> {
     if (k < 1) return [];
     const returnFields = ['dist', ...spec.storedTextFields, ...spec.tagFields, ...spec.numericFields];

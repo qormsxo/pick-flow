@@ -18,6 +18,7 @@ export function decayedScore(score: number, ageDays: number): number {
   return score * Math.pow(0.5, ageDays / HOT_WINDOW_DAYS);
 }
 
+/** 날짜별 점수를 감소시켜 합친 뒤 높은 순으로 자른다. */
 export function rankPopularity(
   days: Array<{ ageDays: number; rows: Array<{ member: string; score: number }> }>,
   limit: number,

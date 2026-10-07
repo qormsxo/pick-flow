@@ -15,6 +15,7 @@ export interface BuiltProfile {
   categoryWeights: Record<string, number>;
 }
 
+/** 행동 무게와 시간 감소를 곱해 상품 좌표를 취향 좌표 하나로 합친다. */
 export function buildProfile(signals: ProfileSignal[], dimension: number): BuiltProfile | null {
   if (signals.length === 0) return null;
 

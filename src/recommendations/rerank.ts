@@ -40,6 +40,7 @@ export function parseRerank(text: string, allowed: ReadonlySet<string>, limit: n
   return limited;
 }
 
+/** 프로필과 후보만 넣는다. 전체 상품 테이블은 넘기지 않는다. */
 export function buildRerankPrompt(profileText: string, candidateText: string, limit: number): string {
   return [
     '아래 후보 안에서만 이 사용자에게 맞는 순서를 정해라.',

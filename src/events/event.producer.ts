@@ -16,6 +16,7 @@ export class EventProducer implements EventSink {
     @InjectQueue(QUEUE_PROFILE_REFRESH) private readonly profiles: Queue<ProfileRefreshJob>,
   ) {}
 
+  /** 같은 clientEventId 는 jobId 가 같아 큐에 한 번만 들어간다. */
   async enqueue(job: UserEventJob): Promise<void> {
     await this.events.add('ingest', job, {
       jobId: job.clientEventId,

@@ -54,6 +54,7 @@ export class SemanticCacheService implements OnModuleInit {
     await this.vectors.ensureIndex(this.spec);
   }
 
+  /** 글자가 같으면 바로 재사용하고, 아니면 좌표 유사도가 기준 이상일 때만 재사용한다. 검색이 죽으면 생성하지 않는다. */
   async resolve(input: ResolveInput): Promise<SemanticResolution> {
     const normalized = normalizeQuestion(input.text);
     const exact = await this.readExact(normalized);
@@ -148,6 +149,7 @@ export class SemanticCacheService implements OnModuleInit {
     await this.redis.deleteByPattern(`${this.options.exactPrefix}*`);
   }
 
+  /** 새 답을 만들고 좌표 인덱스와 글자 키 양쪽에 저장한다. */
   private async generate(
     normalized: string,
     embedding: number[],
@@ -198,6 +200,7 @@ export class SemanticCacheService implements OnModuleInit {
     return { id: top.id, similarity: top.similarity, payload: parsePayload(top.fields.payload) };
   }
 
+  /** 유사도가 기준 이상이고, 태그 조건이 있으면 그것도 맞을 때만 재사용한다. */
   private accepted(
     hit: { id: string; similarity: number; payload: SemanticPayload | null } | null,
     accept?: (payload: SemanticPayload) => boolean,

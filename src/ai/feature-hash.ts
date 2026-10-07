@@ -44,6 +44,7 @@ const STOPWORDS = new Set([
   '에게',
 ]);
 
+/** 내용 단어를 고정 칸에 해시해 가짜 좌표를 만든다. */
 export function featureHashEmbedding(text: string, dimension: number): number[] {
   const vector = Array.from({ length: dimension }, () => 0);
   const tokens = contentTokens(text);

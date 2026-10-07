@@ -46,6 +46,7 @@ export class ProductIndexService implements OnModuleInit {
     await this.vectors.ensureIndex(this.spec);
   }
 
+  /** 상품 좌표를 14일 TTL로 Redis 검색 인덱스에 넣는다. 다시 넣으면 기간이 연장된다. */
   async upsert(product: IndexableProduct): Promise<void> {
     await this.vectors.upsert(this.spec, {
       id: product.id,
@@ -60,6 +61,7 @@ export class ProductIndexService implements OnModuleInit {
     }, HOT_WINDOW_SEC);
   }
 
+  /** 좌표와 코사인이 가까운 상품 k개를 가져온다. */
   async search(embedding: number[], k: number): Promise<IndexedProduct[]> {
     const hits = await this.vectors.search(this.spec, embedding, k);
 

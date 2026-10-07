@@ -24,6 +24,7 @@ export class UserEventProcessor extends WorkerHost {
     super();
   }
 
+  /** 행동을 저장하고 인기 점수를 올린 뒤, 좌표가 있으면 검색 기간을 연장하고 취향 갱신을 예약한다. */
   async process(job: Job<UserEventJob>): Promise<void> {
     const existing = await this.events.findByClientEventId(job.data.clientEventId);
 

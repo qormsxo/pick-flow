@@ -88,6 +88,7 @@ export class RedisService implements OnModuleDestroy, DedupeStore, JsonStore {
     await this.client.set(key, payload);
   }
 
+  /** 키가 없을 때만 저장한다. 같은 요청 번호는 한 번만 통과한다. */
   async setNx(key: string, value: string, ttlSec: number): Promise<boolean> {
     const result = await this.client.set(key, value, 'EX', ttlSec, 'NX');
 
@@ -161,6 +162,7 @@ export class RedisService implements OnModuleDestroy, DedupeStore, JsonStore {
     return removed;
   }
 
+  /** 잠금을 잡으면 작업을 하고, 놓치면 기다리는 쪽을 실행한다. 끝난 뒤 내 토큰일 때만 잠금을 푼다. */
   async withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>, onBusy: () => Promise<T>): Promise<T> {
     const token = randomUUID();
     const acquired = await this.client.set(key, token, 'PX', ttlMs, 'NX');

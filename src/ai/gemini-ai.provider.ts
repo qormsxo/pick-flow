@@ -43,6 +43,7 @@ export class GeminiProvider implements AiProvider {
     this.dimension = config.getOrThrow<number>('ai.embeddingDim');
   }
 
+  /** 글을 384개 좌표로 받고 길이를 맞춘 뒤 단위 벡터로 만든다. */
   async embed(text: string): Promise<AiEmbedding> {
     const body = await this.post(`${this.embeddingModel}:embedContent`, {
       content: { parts: [{ text }] },
@@ -75,6 +76,7 @@ export class GeminiProvider implements AiProvider {
     return this.generate(systemPrompt, prompt, true);
   }
 
+  /** 시스템 지시와 프롬프트를 보낸다. JSON 모드면 배열만 받는다. */
   private async generate(systemPrompt: string, prompt: string, json: boolean): Promise<AiCompletion> {
     const generationConfig: JsonObject = json
       ? { temperature: 0.2, responseMimeType: 'application/json' }
